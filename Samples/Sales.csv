@@ -1,0 +1,151 @@
+Date,Store,Item,Category,Quantity,Unit Price,Total
+2026-07-01,Riverside,Almond croissant,Pastry,29,4.25,123.25
+2026-07-01,Riverside,Sourdough loaf,Bread,8,6.50,52.00
+2026-07-01,Riverside,Cinnamon bun,Pastry,27,3.75,101.25
+2026-07-02,Harbor Street,Lemon tart,Cake,8,4.50,36.00
+2026-07-02,Market Square,Cinnamon bun,Pastry,31,3.75,116.25
+2026-07-03,Riverside,Rye bread,Bread,9,5.90,53.10
+2026-07-03,Riverside,Cold brew,Coffee,7,4.10,28.70
+2026-07-04,Riverside,Rye bread,Bread,44,5.90,259.60
+2026-07-04,Riverside,Baguette,Bread,7,3.10,21.70
+2026-07-05,Harbor Street,Cold brew,Coffee,7,4.10,28.70
+2026-07-05,Harbor Street,Sourdough loaf,Bread,39,6.50,253.50
+2026-07-05,Harbor Street,Blueberry muffin,Pastry,30,3.20,96.00
+2026-07-05,Riverside,Lemon tart,Cake,5,4.50,22.50
+2026-07-06,Harbor Street,Lemon tart,Cake,23,4.50,103.50
+2026-07-06,Riverside,Cinnamon bun,Pastry,41,3.75,153.75
+2026-07-06,Market Square,Chai latte,Coffee,16,3.90,62.40
+2026-07-07,Harbor Street,Lemon tart,Cake,24,4.50,108.00
+2026-07-07,Riverside,Baguette,Bread,7,3.10,21.70
+2026-07-08,Riverside,Carrot cake slice,Cake,23,4.80,110.40
+2026-07-08,Market Square,Cold brew,Coffee,53,4.10,217.30
+2026-07-09,Market Square,Baguette,Bread,33,3.10,102.30
+2026-07-09,Harbor Street,Blueberry muffin,Pastry,19,3.20,60.80
+2026-07-09,Harbor Street,Brownie,Cake,9,3.40,30.60
+2026-07-10,Market Square,Blueberry muffin,Pastry,37,3.20,118.40
+2026-07-10,Market Square,Flat white,Coffee,50,3.60,180.00
+2026-07-10,Harbor Street,Blueberry muffin,Pastry,42,3.20,134.40
+2026-07-10,Market Square,Cinnamon bun,Pastry,36,3.75,135.00
+2026-07-11,Market Square,Flat white,Coffee,13,3.60,46.80
+2026-07-11,Riverside,Cold brew,Coffee,6,4.10,24.60
+2026-07-12,Market Square,Lemon tart,Cake,20,4.50,90.00
+2026-07-12,Market Square,Flat white,Coffee,48,3.60,172.80
+2026-07-13,Market Square,Carrot cake slice,Cake,20,4.80,96.00
+2026-07-13,Harbor Street,Cinnamon bun,Pastry,57,3.75,213.75
+2026-07-13,Riverside,Blueberry muffin,Pastry,34,3.20,108.80
+2026-07-13,Harbor Street,Chai latte,Coffee,8,3.90,31.20
+2026-07-14,Riverside,Brownie,Cake,11,3.40,37.40
+2026-07-14,Market Square,Baguette,Bread,47,3.10,145.70
+2026-07-14,Market Square,Blueberry muffin,Pastry,49,3.20,156.80
+2026-07-14,Harbor Street,Chai latte,Coffee,26,3.90,101.40
+2026-07-15,Riverside,Flat white,Coffee,14,3.60,50.40
+2026-07-15,Harbor Street,Cinnamon bun,Pastry,35,3.75,131.25
+2026-07-15,Market Square,Rye bread,Bread,53,5.90,312.70
+2026-07-16,Market Square,Brownie,Cake,9,3.40,30.60
+2026-07-16,Market Square,Cold brew,Coffee,59,4.10,241.90
+2026-07-17,Market Square,Almond croissant,Pastry,32,4.25,136.00
+2026-07-17,Harbor Street,Lemon tart,Cake,10,4.50,45.00
+2026-07-18,Riverside,Lemon tart,Cake,10,4.50,45.00
+2026-07-18,Riverside,Cold brew,Coffee,26,4.10,106.60
+2026-07-18,Harbor Street,Cold brew,Coffee,18,4.10,73.80
+2026-07-19,Harbor Street,Almond croissant,Pastry,13,4.25,55.25
+2026-07-19,Harbor Street,Chai latte,Coffee,18,3.90,70.20
+2026-07-20,Market Square,Baguette,Bread,15,3.10,46.50
+2026-07-20,Harbor Street,Blueberry muffin,Pastry,4,3.20,12.80
+2026-07-20,Market Square,Cold brew,Coffee,38,4.10,155.80
+2026-07-21,Harbor Street,Baguette,Bread,24,3.10,74.40
+2026-07-21,Riverside,Brownie,Cake,18,3.40,61.20
+2026-07-21,Riverside,Chai latte,Coffee,47,3.90,183.30
+2026-07-21,Riverside,Sourdough loaf,Bread,33,6.50,214.50
+2026-07-22,Market Square,Cold brew,Coffee,29,4.10,118.90
+2026-07-22,Market Square,Cold brew,Coffee,10,4.10,41.00
+2026-07-22,Harbor Street,Chai latte,Coffee,29,3.90,113.10
+2026-07-22,Harbor Street,Rye bread,Bread,8,5.90,47.20
+2026-07-23,Market Square,Almond croissant,Pastry,11,4.25,46.75
+2026-07-23,Harbor Street,Baguette,Bread,7,3.10,21.70
+2026-07-23,Harbor Street,Sourdough loaf,Bread,40,6.50,260.00
+2026-07-24,Riverside,Cinnamon bun,Pastry,27,3.75,101.25
+2026-07-24,Harbor Street,Sourdough loaf,Bread,8,6.50,52.00
+2026-07-24,Harbor Street,Baguette,Bread,28,3.10,86.80
+2026-07-24,Market Square,Chai latte,Coffee,20,3.90,78.00
+2026-07-25,Harbor Street,Flat white,Coffee,34,3.60,122.40
+2026-07-25,Market Square,Cinnamon bun,Pastry,58,3.75,217.50
+2026-07-25,Market Square,Carrot cake slice,Cake,17,4.80,81.60
+2026-07-25,Harbor Street,Blueberry muffin,Pastry,9,3.20,28.80
+2026-07-26,Riverside,Brownie,Cake,12,3.40,40.80
+2026-07-26,Riverside,Blueberry muffin,Pastry,34,3.20,108.80
+2026-07-27,Harbor Street,Lemon tart,Cake,2,4.50,9.00
+2026-07-27,Harbor Street,Lemon tart,Cake,13,4.50,58.50
+2026-07-28,Riverside,Lemon tart,Cake,2,4.50,9.00
+2026-07-28,Harbor Street,Blueberry muffin,Pastry,45,3.20,144.00
+2026-07-28,Riverside,Brownie,Cake,10,3.40,34.00
+2026-07-28,Market Square,Flat white,Coffee,14,3.60,50.40
+2026-07-29,Riverside,Lemon tart,Cake,19,4.50,85.50
+2026-07-29,Harbor Street,Flat white,Coffee,44,3.60,158.40
+2026-07-30,Harbor Street,Rye bread,Bread,55,5.90,324.50
+2026-07-30,Harbor Street,Cold brew,Coffee,51,4.10,209.10
+2026-07-30,Market Square,Rye bread,Bread,37,5.90,218.30
+2026-07-30,Harbor Street,Flat white,Coffee,50,3.60,180.00
+2026-07-31,Market Square,Blueberry muffin,Pastry,34,3.20,108.80
+2026-07-31,Riverside,Rye bread,Bread,48,5.90,283.20
+2026-08-01,Market Square,Carrot cake slice,Cake,13,4.80,62.40
+2026-08-01,Harbor Street,Cinnamon bun,Pastry,18,3.75,67.50
+2026-08-01,Harbor Street,Rye bread,Bread,34,5.90,200.60
+2026-08-02,Riverside,Rye bread,Bread,34,5.90,200.60
+2026-08-02,Harbor Street,Baguette,Bread,57,3.10,176.70
+2026-08-02,Market Square,Carrot cake slice,Cake,22,4.80,105.60
+2026-08-03,Riverside,Cinnamon bun,Pastry,57,3.75,213.75
+2026-08-03,Riverside,Cinnamon bun,Pastry,28,3.75,105.00
+2026-08-03,Harbor Street,Rye bread,Bread,34,5.90,200.60
+2026-08-03,Riverside,Cold brew,Coffee,54,4.10,221.40
+2026-08-04,Riverside,Cinnamon bun,Pastry,55,3.75,206.25
+2026-08-04,Market Square,Cold brew,Coffee,33,4.10,135.30
+2026-08-04,Riverside,Brownie,Cake,4,3.40,13.60
+2026-08-05,Harbor Street,Almond croissant,Pastry,12,4.25,51.00
+2026-08-05,Market Square,Almond croissant,Pastry,41,4.25,174.25
+2026-08-06,Riverside,Almond croissant,Pastry,43,4.25,182.75
+2026-08-06,Market Square,Carrot cake slice,Cake,23,4.80,110.40
+2026-08-06,Riverside,Almond croissant,Pastry,39,4.25,165.75
+2026-08-06,Harbor Street,Almond croissant,Pastry,5,4.25,21.25
+2026-08-07,Riverside,Chai latte,Coffee,10,3.90,39.00
+2026-08-07,Market Square,Brownie,Cake,6,3.40,20.40
+2026-08-07,Harbor Street,Rye bread,Bread,56,5.90,330.40
+2026-08-07,Harbor Street,Sourdough loaf,Bread,20,6.50,130.00
+2026-08-08,Riverside,Lemon tart,Cake,9,4.50,40.50
+2026-08-08,Riverside,Flat white,Coffee,20,3.60,72.00
+2026-08-08,Harbor Street,Cold brew,Coffee,57,4.10,233.70
+2026-08-09,Market Square,Brownie,Cake,13,3.40,44.20
+2026-08-09,Riverside,Chai latte,Coffee,41,3.90,159.90
+2026-08-10,Riverside,Lemon tart,Cake,6,4.50,27.00
+2026-08-10,Riverside,Almond croissant,Pastry,37,4.25,157.25
+2026-08-10,Market Square,Sourdough loaf,Bread,59,6.50,383.50
+2026-08-11,Harbor Street,Baguette,Bread,4,3.10,12.40
+2026-08-11,Market Square,Almond croissant,Pastry,13,4.25,55.25
+2026-08-12,Riverside,Brownie,Cake,5,3.40,17.00
+2026-08-12,Riverside,Sourdough loaf,Bread,24,6.50,156.00
+2026-08-12,Riverside,Lemon tart,Cake,18,4.50,81.00
+2026-08-12,Riverside,Carrot cake slice,Cake,5,4.80,24.00
+2026-08-13,Market Square,Rye bread,Bread,16,5.90,94.40
+2026-08-13,Harbor Street,Sourdough loaf,Bread,53,6.50,344.50
+2026-08-14,Harbor Street,Carrot cake slice,Cake,19,4.80,91.20
+2026-08-14,Market Square,Cinnamon bun,Pastry,32,3.75,120.00
+2026-08-14,Riverside,Baguette,Bread,36,3.10,111.60
+2026-08-14,Riverside,Lemon tart,Cake,8,4.50,36.00
+2026-08-15,Riverside,Carrot cake slice,Cake,18,4.80,86.40
+2026-08-15,Harbor Street,Carrot cake slice,Cake,18,4.80,86.40
+2026-08-15,Market Square,Brownie,Cake,18,3.40,61.20
+2026-08-16,Market Square,Rye bread,Bread,57,5.90,336.30
+2026-08-16,Harbor Street,Almond croissant,Pastry,30,4.25,127.50
+2026-08-16,Market Square,Cold brew,Coffee,32,4.10,131.20
+2026-08-16,Harbor Street,Cinnamon bun,Pastry,46,3.75,172.50
+2026-08-17,Riverside,Cinnamon bun,Pastry,17,3.75,63.75
+2026-08-17,Harbor Street,Blueberry muffin,Pastry,54,3.20,172.80
+2026-08-17,Riverside,Almond croissant,Pastry,49,4.25,208.25
+2026-08-18,Market Square,Flat white,Coffee,13,3.60,46.80
+2026-08-18,Harbor Street,Almond croissant,Pastry,33,4.25,140.25
+2026-08-18,Market Square,Brownie,Cake,5,3.40,17.00
+2026-08-18,Riverside,Carrot cake slice,Cake,7,4.80,33.60
+2026-08-19,Market Square,Almond croissant,Pastry,49,4.25,208.25
+2026-08-19,Market Square,Lemon tart,Cake,14,4.50,63.00
+2026-08-20,Market Square,Rye bread,Bread,26,5.90,153.40
+2026-08-20,Market Square,Cinnamon bun,Pastry,50,3.75,187.50

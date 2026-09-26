@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Versions
+        run: |
+          sw_vers
+          swift --version
+
+      - name: Unit tests
+        run: swift test
+
+      - name: Build Handa.app (Apple silicon + Intel)
+        run: Scripts/build.sh --universal
+
+      - name: Check the bundle
+        run: |
+          plutil -lint build/Handa.app/Contents/Info.plist
+          codesign --verify --deep --strict build/Handa.app
+          lipo -info build/Handa.app/Contents/MacOS/Handa
+          du -sh build/Handa.app
+
+      - name: Smoke test the real app
+        run: Scripts/smoke-test.sh
+
+      - name: Screenshots
+        if: matrix.os == 'macos-26'
+        run: Scripts/screenshots.sh
+
+      - name: Package
+        run: ditto -c -k --keepParent build/Handa.app build/Handa.zip
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Handa-${{ matrix.os }}
+          path: build/Handa.zip
+
+      - uses: actions/upload-artifact@v7
+        if: matrix.os == 'macos-26'
+        with:
+          name: screenshots
+          path: |
+            build/screenshots
+            build/launch-times.txt

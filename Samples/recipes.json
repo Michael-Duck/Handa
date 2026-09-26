@@ -1,0 +1,33 @@
+{
+  "bakery": "Harbor Street",
+  "updated": "2026-09-21",
+  "recipes": [
+    {
+      "name": "Rye bread",
+      "yield": 12,
+      "bakeMinutes": 45,
+      "ovenCelsius": 230,
+      "ingredients": [
+        { "item": "Rye flour", "grams": 3000 },
+        { "item": "Water", "grams": 2400 },
+        { "item": "Rye starter", "grams": 600 },
+        { "item": "Salt", "grams": 60 }
+      ],
+      "vegan": true
+    },
+    {
+      "name": "Cinnamon bun",
+      "yield": 24,
+      "bakeMinutes": 18,
+      "ovenCelsius": 200,
+      "ingredients": [
+        { "item": "Wheat flour", "grams": 1500 },
+        { "item": "Butter", "grams": 450 },
+        { "item": "Brown sugar", "grams": 300 },
+        { "item": "Cinnamon", "grams": 40 }
+      ],
+      "vegan": false,
+      "notes": null
+    }
+  ]
+}
