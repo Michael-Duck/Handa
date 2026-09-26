@@ -42,9 +42,9 @@ cd Handa
 make install
 ```
 
-Open Handa and click **Make Default**, and PDFs, Word files, CSVs, Markdown, text and images will open in it from Finder. You can pick which in **Settings → General**.
+That puts Handa in Applications and makes it the app that opens PDFs, Word files, CSVs, Markdown, text, code and images when you double-click them. To choose which, open **Settings → General**.
 
-Prefer a download? Tagged versions come with a `Handa.zip` on the [Releases](https://github.com/Michael-Duck/Handa/releases) page. The app isn't notarised, so the first time macOS will stop it: open **System Settings → Privacy & Security** and click **Open Anyway**.
+Prefer a download? Tagged versions come with a `Handa.zip` on the [Releases](https://github.com/Michael-Duck/Handa/releases) page, and Handa offers to become your default viewer the first time you open it. The app isn't notarised, so macOS will stop it at first: open **System Settings → Privacy & Security** and click **Open Anyway**.
 
 ## Using it
 
@@ -55,7 +55,7 @@ Prefer a download? Tagged versions come with a `Handa.zip` on the [Releases](htt
 
 ## AI, if you want it
 
-AI is off until you turn it on in **Settings → AI**. Then:
+AI is off until you turn it on in **Settings → AI**, and even then a file is only shared when you ask. Once it's on:
 
 - **Connect Claude.** Handa has a built-in MCP server. Click **Add to Claude Desktop**, or for Claude Code run
   `claude mcp add --scope user handa -- /Applications/Handa.app/Contents/MacOS/Handa mcp`.

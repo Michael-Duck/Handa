@@ -122,15 +122,25 @@ final class QuickLookViewer: Viewer {
     private var preview: QLPreviewView?
 
     override func loadView() {
-        guard let url = document.fileURL, let preview = QLPreviewView(frame: NSRect(x: 0, y: 0, width: 900, height: 700), style: .normal) else {
+        guard let preview = QLPreviewView(frame: NSRect(x: 0, y: 0, width: 900, height: 700), style: .normal) else {
             view = NSView()
             return
         }
         preview.autostarts = true
         preview.shouldCloseWithWindow = true
-        preview.previewItem = url as NSURL
         self.preview = preview
         view = preview
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        guard let preview = preview, preview.previewItem == nil, let url = document.fileURL else { return }
+        // Quick Look can take a while to start (most of a second for a first Word file), so the
+        // window goes up first and the preview follows on the next pass of the run loop.
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(1)) {
+            guard preview.window != nil else { return } // closed or replaced in the meantime
+            preview.previewItem = url as NSURL
+        }
     }
 
     override var preferredFirstResponder: NSView? { preview }

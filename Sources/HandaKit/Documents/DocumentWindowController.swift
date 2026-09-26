@@ -609,6 +609,8 @@ final class ContainerViewController: NSViewController {
         let content = viewer.view
         content.setContentHuggingPriority(.defaultLow, for: .vertical)
         content.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        // Keep the status bar in front, so nothing a viewer draws past its edge can cover it.
+        stack.addSubview(content, positioned: .below, relativeTo: statusBar)
         stack.insertArrangedSubview(content, at: 1)
         current = viewer
     }

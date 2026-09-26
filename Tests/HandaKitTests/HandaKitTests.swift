@@ -309,6 +309,28 @@ final class HandaKitTests: XCTestCase {
         document.close()
     }
 
+    /// Table cells are placed by hand rather than with constraints, so check they fill their column.
+    func testTableCellsFillTheirColumns() throws {
+        let document = try open(sample("Sales.csv"))
+        document.makeWindowControllers()
+        let controller = try XCTUnwrap(document.windowController)
+        let viewer = try XCTUnwrap(controller.viewer as? TableViewer)
+        let window = try XCTUnwrap(controller.window)
+        window.setContentSize(NSSize(width: 900, height: 600))
+        window.orderFront(nil)
+        window.displayIfNeeded()
+        for column in [0, 3, 5] {
+            let cell = try XCTUnwrap(viewer.tableView.view(atColumn: column, row: 0, makeIfNecessary: true) as? NSTableCellView)
+            let field = try XCTUnwrap(cell.textField)
+            XCTAssertEqual(cell.frame.width, viewer.tableView.tableColumns[column].width, accuracy: 1)
+            XCTAssertEqual(field.frame.width, cell.bounds.width - 16, accuracy: 1, "column \(column)")
+            XCTAssertEqual(field.frame.midY, cell.bounds.midY, accuracy: 1.5, "column \(column)")
+            XCTAssertFalse(field.stringValue.isEmpty, "column \(column)")
+        }
+        window.close()
+        document.close()
+    }
+
     // MARK: MCP
 
     func testMCPToolsOnRealFiles() throws {

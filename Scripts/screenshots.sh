@@ -56,7 +56,8 @@ shot markdown "Samples/Opening Checklist.md" HANDA_APPEARANCE=dark
 shot code "Samples/inventory.py" HANDA_APPEARANCE=dark
 shot image "Samples/Harbor.png"
 WAIT=4 shot quicklook "Samples/Budget.xlsx"
-WAIT=3 APP_ARGS="-AIEnabled YES" shot ai "Samples/Sales.csv" HANDA_SHOW_REVIEWS=1
+WAIT=3 APP_ARGS="-AIEnabled YES" shot ai "Samples/Sales.csv" HANDA_SHOW_REVIEWS=1 HANDA_DUMP_VIEWS=1
+sed -n '/HANDA_VIEWS/,$p' "$WORK/ai.log" | head -200
 APP_ARGS="-AIEnabled YES" shot settings - HANDA_SHOW=settings-ai
 # Last, so Recent Files lists the samples opened above.
 shot welcome - HANDA_SHOW=welcome

@@ -145,6 +145,26 @@ print("mcp: ok,", len(tools), "tools")
 ls "$HANDA_HOME/Reviews/"*.json >/dev/null 2>&1 || fail "mcp review was not stored"
 
 echo
+echo "Default app:"
+# Asks Launch Services which app a double-click would use.
+cat > "$WORK/opens-with.js" <<'JS'
+ObjC.import("AppKit")
+function run(argv) {
+  const app = $.NSWorkspace.sharedWorkspace.URLForApplicationToOpenURL($.NSURL.fileURLWithPath(argv[0]))
+  return app.isNil() ? "nothing" : ObjC.unwrap($.NSBundle.bundleWithURL(app).bundleIdentifier)
+}
+JS
+if "$BIN" make-default; then
+  for f in "Quarterly Report.pdf" "Team Meeting.docx" "Sales.csv" "Opening Checklist.md" "inventory.py" "Harbor.png"; do
+    owner=$(osascript -l JavaScript "$WORK/opens-with.js" "$PWD/Samples/$f" 2>&1 || true)
+    [ "$owner" = "io.github.michael-duck.handa" ] || fail "$f opens with $owner, not Handa"
+  done
+  echo "make-default: ok"
+else
+  fail "make-default"
+fi
+
+echo
 if [ "$failures" -gt 0 ]; then
   echo "$failures check(s) failed"
   exit 1

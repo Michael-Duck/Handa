@@ -146,15 +146,16 @@ final class TableViewer: Viewer, NSTableViewDataSource, NSTableViewDelegate, NST
         field.stringValue = content.value(row: dataRow, column: column)
         field.alignment = numericColumns.contains(column) ? .right : .natural
         field.isEditable = isEditing
-        field.font = numericColumns.contains(column) ? NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular) : NSFont.systemFont(ofSize: 13)
+        field.font = numericColumns.contains(column) ? TableViewer.numberFont : TableViewer.textFont
         return cell
     }
 
     private func makeCell(identifier: NSUserInterfaceItemIdentifier) -> NSTableCellView {
-        let cell = NSTableCellView()
+        // Plain frames, not constraints: a table fills the window with hundreds of cells at once,
+        // and solving constraints for each one was the slowest part of opening a CSV.
+        let cell = NSTableCellView(frame: NSRect(x: 0, y: 0, width: 100, height: tableView.rowHeight))
         cell.identifier = identifier
         let field = NSTextField(labelWithString: "")
-        field.translatesAutoresizingMaskIntoConstraints = false
         field.lineBreakMode = .byTruncatingTail
         field.cell?.truncatesLastVisibleLine = true
         field.isSelectable = false
@@ -164,16 +165,20 @@ final class TableViewer: Viewer, NSTableViewDataSource, NSTableViewDelegate, NST
             field.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
             field.textColor = .tertiaryLabelColor
             field.alignment = .right
+        } else {
+            field.font = TableViewer.textFont
         }
+        field.sizeToFit()
+        let height = field.frame.height
+        field.frame = NSRect(x: 8, y: ((cell.bounds.height - height) / 2).rounded(), width: cell.bounds.width - 16, height: height)
+        field.autoresizingMask = [.width, .minYMargin, .maxYMargin]
         cell.addSubview(field)
         cell.textField = field
-        NSLayoutConstraint.activate([
-            field.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
-            field.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
-            field.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-        ])
         return cell
     }
+
+    private static let textFont = NSFont.systemFont(ofSize: 13)
+    private static let numberFont = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)
 
     private func columnIndex(_ column: NSTableColumn) -> Int {
         Int(column.identifier.rawValue.dropFirst()) ?? 0

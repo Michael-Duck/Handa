@@ -131,6 +131,7 @@ final class ReviewPanelController: NSViewController {
     private var textView: NSTextView!
     private var spinner: NSProgressIndicator!
     private var statusLabel: NSTextField!
+    private var statusRow: NSStackView!
     private var observer: NSObjectProtocol?
 
     init(document: Document) {
@@ -169,9 +170,9 @@ final class ReviewPanelController: NSViewController {
         spinner.isDisplayedWhenStopped = false
         statusLabel = NSTextField(wrappingLabelWithString: "")
         statusLabel.font = .systemFont(ofSize: 11)
-        let status = NSStackView(views: [spinner, statusLabel])
-        status.spacing = 6
-        status.edgeInsets = NSEdgeInsets(top: 0, left: 14, bottom: 6, right: 12)
+        statusRow = NSStackView(views: [spinner, statusLabel])
+        statusRow.spacing = 6
+        statusRow.edgeInsets = NSEdgeInsets(top: 0, left: 14, bottom: 6, right: 12)
 
         let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 320, height: 500))
         scroll.hasVerticalScroller = true
@@ -189,7 +190,7 @@ final class ReviewPanelController: NSViewController {
         textView.layoutManager?.allowsNonContiguousLayout = true
         scroll.documentView = textView
 
-        let stack = NSStackView(views: [header, status, scroll])
+        let stack = NSStackView(views: [header, statusRow, scroll])
         stack.orientation = .vertical
         stack.alignment = .width
         stack.spacing = 0
@@ -223,15 +224,15 @@ final class ReviewPanelController: NSViewController {
         case .idle:
             spinner.stopAnimation(nil)
             statusLabel.stringValue = ""
-            statusLabel.isHidden = true
+            statusRow.isHidden = true
         case .running:
             spinner.startAnimation(nil)
-            statusLabel.isHidden = false
+            statusRow.isHidden = false
             statusLabel.textColor = .secondaryLabelColor
             statusLabel.stringValue = Preferences.reviewProvider == .claude ? "Asking Claude…" : "Running your review command…"
         case .failed(let message):
             spinner.stopAnimation(nil)
-            statusLabel.isHidden = false
+            statusRow.isHidden = false
             statusLabel.textColor = .systemRed
             statusLabel.stringValue = message
         }
