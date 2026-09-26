@@ -64,17 +64,22 @@ enum DefaultApps {
 
     static var appURL: URL { Bundle.main.bundleURL }
 
+    /// The app that opens the category's files now: the first one that isn't Handa, if any.
     static func currentApp(for category: Category) -> URL? {
-        category.types.first.flatMap { NSWorkspace.shared.urlForApplication(toOpen: $0) }
+        let apps = category.types.compactMap { NSWorkspace.shared.urlForApplication(toOpen: $0) }
+        return apps.first { !isHanda($0) } ?? apps.first
     }
 
     /// True when Handa opens every file type in the category.
     static func isHandaDefault(for category: Category) -> Bool {
         category.types.allSatisfy { type in
-            guard let current = NSWorkspace.shared.urlForApplication(toOpen: type) else { return false }
-            return current.standardizedFileURL.resolvingSymlinksInPath() == appURL.standardizedFileURL.resolvingSymlinksInPath()
-                || Bundle(url: current)?.bundleIdentifier == Bundle.main.bundleIdentifier
+            NSWorkspace.shared.urlForApplication(toOpen: type).map(isHanda) ?? false
         }
+    }
+
+    private static func isHanda(_ app: URL) -> Bool {
+        app.standardizedFileURL.resolvingSymlinksInPath() == appURL.standardizedFileURL.resolvingSymlinksInPath()
+            || Bundle(url: app)?.bundleIdentifier == Bundle.main.bundleIdentifier
     }
 
     static func appName(for url: URL?) -> String {

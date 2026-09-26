@@ -13,11 +13,11 @@ mkdir -p "$OUT"
 
 system_profiler SPDisplaysDataType 2>/dev/null | grep -E "Resolution|UI Looks like" || true
 
-# Counts screenshots whose middle is one flat colour, which means the window drew nothing there.
+# True unless the middle of a screenshot is one flat colour, which means the window drew nothing there.
 blank=0
-check_drawn() {
+looks_drawn() {
   sips -s format bmp "$1" --out "$WORK/check.bmp" >/dev/null 2>&1 || return 0
-  if ! python3 - "$WORK/check.bmp" <<'PY'
+  python3 - "$WORK/check.bmp" <<'PY'
 import collections, struct, sys
 data = open(sys.argv[1], "rb").read()
 offset = struct.unpack_from("<I", data, 10)[0]
@@ -31,10 +31,6 @@ for y in range(height // 4, height * 3 // 4, 3):
         colours[data[start + x * depth:start + x * depth + 3]] += 1
 sys.exit(1 if colours.most_common(1)[0][1] / sum(colours.values()) > 0.995 else 0)
 PY
-  then
-    echo "FAIL: $(basename "$1") looks blank"
-    blank=$((blank + 1))
-  fi
 }
 
 # shot <name> <file or -> [VAR=value …]   (APP_ARGS adds arguments for the app)
@@ -59,8 +55,16 @@ shot() {
   sleep "${WAIT:-2}"
   local window
   window=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["windowNumber"])' "$ready")
-  screencapture -x -l "$window" "$OUT/$name.png"
-  check_drawn "$OUT/$name.png"
+  # Quick Look in particular can take a moment, so give a blank-looking window a few more seconds.
+  for _ in 1 2 3 4 5; do
+    screencapture -x -l "$window" "$OUT/$name.png"
+    if looks_drawn "$OUT/$name.png"; then break; fi
+    sleep 1
+  done
+  if ! looks_drawn "$OUT/$name.png"; then
+    echo "FAIL: $name.png looks blank"
+    blank=$((blank + 1))
+  fi
   kill "$pid" 2>/dev/null || true
   for _ in $(seq 1 50); do ps -p "$pid" >/dev/null 2>&1 || break; sleep 0.1; done
   kill -9 "$pid" 2>/dev/null || true
