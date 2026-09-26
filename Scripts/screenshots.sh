@@ -28,7 +28,7 @@ shot() {
   local pid=$!
   for _ in $(seq 1 150); do [ -f "$ready" ] && break; sleep 0.1; done
   if [ ! -f "$ready" ]; then
-    echo "No window for $name"; cat "$WORK/$name.log"; kill "$pid" 2>/dev/null || true; return 1
+    echo "No window for $name"; cat "$WORK/$name.log"; kill -9 "$pid" 2>/dev/null || true; return 1
   fi
   # Bring the app to the front so the window is drawn as active.
   osascript -e "tell application \"System Events\" to set frontmost of (first process whose unix id is $pid) to true" >/dev/null 2>&1 || true
@@ -37,6 +37,8 @@ shot() {
   window=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["windowNumber"])' "$ready")
   screencapture -x -l "$window" "$OUT/$name.png"
   kill "$pid" 2>/dev/null || true
+  for _ in $(seq 1 50); do ps -p "$pid" >/dev/null 2>&1 || break; sleep 0.1; done
+  kill -9 "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   echo "Captured $name.png"
 }

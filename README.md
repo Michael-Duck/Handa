@@ -16,7 +16,7 @@ It's plain Swift on Apple's own frameworks, with no dependencies. The whole app 
 <table>
 <tr>
 <td width="50%"><b>PDF</b><br>Thumbnails, search, highlight, underline, notes. Rotate or delete pages.<br><img src="docs/screenshots/pdf.png" alt="PDF"></td>
-<td width="50%"><b>Word, RTF, OpenDocument</b><br>Laid out on a page. Edit the text and formatting.<br><img src="docs/screenshots/word.png" alt="Word document"></td>
+<td width="50%"><b>Word, RTF, OpenDocument</b><br>Shown in their original layout. Press Edit to change the text.<br><img src="docs/screenshots/word.png" alt="Word document"></td>
 </tr>
 <tr>
 <td><b>CSV and TSV</b><br>A real table: sort, filter, edit cells, add rows and columns.<br><img src="docs/screenshots/csv.png" alt="CSV table"></td>

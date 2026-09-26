@@ -13,6 +13,18 @@ failures=0
 
 fail() { echo "FAIL: $*"; failures=$((failures + 1)); }
 
+# True while the process is running (a zombie counts as finished).
+alive() { local state; state=$(ps -o stat= -p "$1" 2>/dev/null); [ -n "$state" ] && [ "${state#Z}" = "$state" ]; }
+
+# Prints where a stuck app is spending its time, then kills it.
+diagnose() {
+  echo "--- $2: stack sample ---"
+  sample "$1" 1 -file "$WORK/sample.txt" >/dev/null 2>&1 && sed -n '1,/Binary Images/p' "$WORK/sample.txt" | head -120
+  echo "--- app output ---"
+  cat "$WORK/app.log"
+  kill -9 "$1" 2>/dev/null || true
+}
+
 # A few extra files the samples don't cover.
 head -c 4096 /dev/urandom > "$WORK/random.bin"
 printf 'plain text\nwith two lines\n' > "$WORK/notes.txt"
@@ -25,19 +37,27 @@ launch() {
   local pid=$!
   for _ in $(seq 1 150); do
     [ -f "$ready" ] && break
-    kill -0 "$pid" 2>/dev/null || break
+    alive "$pid" || break
     sleep 0.1
   done
   if [ ! -f "$ready" ]; then
-    kill "$pid" 2>/dev/null || true
     fail "$(basename "$file"): no window appeared"
-    cat "$WORK/app.log"
+    if alive "$pid"; then diagnose "$pid" "$(basename "$file")"; else cat "$WORK/app.log"; fi
+    wait "$pid" 2>/dev/null || true
     return
   fi
   local kind ms
   kind=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["kind"])' "$ready")
   ms=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["milliseconds"])' "$ready")
-  if ! wait "$pid"; then fail "$(basename "$file"): app exited with an error"; cat "$WORK/app.log"; fi
+  for _ in $(seq 1 100); do alive "$pid" || break; sleep 0.1; done
+  if alive "$pid"; then
+    fail "$(basename "$file"): the app didn't quit"
+    diagnose "$pid" "$(basename "$file")"
+    wait "$pid" 2>/dev/null || true
+  elif ! wait "$pid"; then
+    fail "$(basename "$file"): app exited with an error"
+    cat "$WORK/app.log"
+  fi
   if [ "$kind" != "$expect" ]; then fail "$(basename "$file"): opened as $kind, expected $expect"; fi
   printf '%-24s %-10s %6s ms\n' "$(basename "$file")" "$kind" "$ms" | tee -a "$RESULTS"
   python3 -c 'import json,sys; p=json.load(open(sys.argv[1])).get("phases",{}); print("    " + "  ".join(f"{k} {v:g}" for k,v in sorted(p.items(), key=lambda x: x[1])))' "$ready"

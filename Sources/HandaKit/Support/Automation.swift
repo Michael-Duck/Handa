@@ -78,7 +78,8 @@ enum Automation {
         try? Data(payload.serialized().utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
         FileHandle.standardError.write(Data("HANDA_READY \(payload.serialized())\n".utf8))
         if let quit = environment["HANDA_QUIT_AFTER"].flatMap({ Double($0) }) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + quit) { exit(0) }
+            // _exit skips exit-time handlers, which can wait on framework threads and hang a benchmark.
+            DispatchQueue.main.asyncAfter(deadline: .now() + quit) { _exit(0) }
         }
     }
 }
