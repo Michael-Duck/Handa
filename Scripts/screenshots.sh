@@ -83,6 +83,7 @@ shot image "Samples/Harbor.png"
 WAIT=4 shot quicklook "Samples/Budget.xlsx"
 WAIT=3 APP_ARGS="-AIEnabled YES" shot ai "Samples/Sales.csv" HANDA_SHOW_REVIEWS=1
 APP_ARGS="-AIEnabled YES" shot settings - HANDA_SHOW=settings-ai
+shot settings-general - HANDA_SHOW=settings
 # Last, so Recent Files lists the samples opened above.
 shot welcome - HANDA_SHOW=welcome
 
