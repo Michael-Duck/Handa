@@ -225,7 +225,7 @@ final class WelcomeWindowController: NSWindowController, NSTableViewDataSource, 
         Preferences.offeredDefaultApp = true
         defaultButtons.isHidden = true
         if DefaultApps.asksToConfirm {
-            defaultLabel.stringValue = "macOS will ask you to confirm each file type."
+            defaultLabel.stringValue = "macOS may ask you to confirm each file type."
         }
         DefaultApps.makeDefault(DefaultApps.essentials) { [weak self] errors in
             self?.defaultLabel.stringValue = errors.isEmpty

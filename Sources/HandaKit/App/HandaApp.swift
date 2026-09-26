@@ -70,7 +70,7 @@ public enum HandaApp {
         let categories = all ? DefaultApps.categories : DefaultApps.essentials
         let count = categories.flatMap(\.types).count
         if DefaultApps.asksToConfirm {
-            print("macOS will ask you to confirm each of the \(count) file types.")
+            print("macOS may ask you to confirm some of these \(count) file types.")
         }
         var finished = false
         var failures = 0

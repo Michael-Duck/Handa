@@ -208,8 +208,8 @@ if [ "$(asks_to_confirm)" = no ]; then
     fail "make-default"
   fi
 else
-  # macOS 26.4 and later ask the user to confirm each file type. Answer "Use Handa" the way a
-  # person would, through System Events, and check each question comes up and takes effect.
+  # macOS 26.4 and later ask before Handa takes over a file type from another app. Answer "Use
+  # Handa" the way a person would, through System Events, and check the change takes effect.
   cat > "$WORK/confirm.js" <<'JS'
 function run() {
   const agent = Application("System Events").processes.byName("CoreServicesUIAgent")

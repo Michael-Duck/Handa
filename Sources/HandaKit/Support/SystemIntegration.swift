@@ -29,7 +29,7 @@ enum DefaultApps {
         /// ".doc, .rtf, .odt" and so on, shown next to the title.
         let extensions: String
         let types: [UTType]
-        /// Part of the short list that Make Default changes. From macOS 26.4 every file type needs
+        /// Part of the short list that Make Default changes. From macOS 26.4 each file type can need
         /// its own confirmation, so the short list sticks to the files people open most.
         var isEssential = false
     }
@@ -57,7 +57,7 @@ enum DefaultApps {
 
     static var essentials: [Category] { categories.filter(\.isEssential) }
 
-    /// macOS 26.4 and later ask the user to confirm every change of default app, one file type at a time.
+    /// macOS 26.4 and later ask the user before an app takes over a file type from another one.
     static var asksToConfirm: Bool {
         ProcessInfo.processInfo.isOperatingSystemAtLeast(OperatingSystemVersion(majorVersion: 26, minorVersion: 4, patchVersion: 0))
     }

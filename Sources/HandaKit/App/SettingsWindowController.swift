@@ -3,7 +3,7 @@ import HandaCore
 
 /// Settings: General (default apps), Viewer, and AI (MCP, reviews, automatic reviews).
 final class SettingsWindowController: NSWindowController {
-    private let tabs = NSTabViewController()
+    private let tabs = SettingsTabs()
 
     convenience init() {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 480),
@@ -33,9 +33,34 @@ final class SettingsWindowController: NSWindowController {
 
     override func showWindow(_ sender: Any?) {
         super.showWindow(sender)
+        tabs.fitWindowToSelectedPane()
         if let window = window {
             DispatchQueue.main.async { Automation.windowReady(window, kind: "settings", file: nil) }
         }
+    }
+}
+
+/// Resizes the window to fit each pane as you switch between them.
+private final class SettingsTabs: NSTabViewController {
+    override func tabView(_ tabView: NSTabView, didSelect tabViewItem: NSTabViewItem?) {
+        super.tabView(tabView, didSelect: tabViewItem)
+        fitWindowToSelectedPane()
+    }
+
+    /// Keeps the window's top edge where it is, and the whole window on screen when it fits.
+    func fitWindowToSelectedPane() {
+        guard let window = view.window, tabViewItems.indices.contains(selectedTabViewItemIndex),
+              let size = tabViewItems[selectedTabViewItemIndex].viewController?.preferredContentSize,
+              size.height > 0, let content = window.contentView else { return }
+        var frame = window.frame
+        frame.size.height += size.height - content.frame.height
+        frame.size.width += size.width - content.frame.width
+        frame.origin.y = window.frame.maxY - frame.height
+        if let visible = window.screen?.visibleFrame {
+            frame.origin.y = min(max(frame.origin.y, visible.minY), visible.maxY - frame.height)
+        }
+        guard frame != window.frame else { return }
+        window.setFrame(frame, display: true, animate: window.isVisible)
     }
 }
 
@@ -96,7 +121,7 @@ private final class GeneralSettings: NSViewController {
 
     override func loadView() {
         let intro = "Choose which files open in Handa when you double-click them in Finder."
-            + (DefaultApps.asksToConfirm ? " macOS asks you to confirm each file type." : "")
+            + (DefaultApps.asksToConfirm ? " macOS may ask you to confirm each one." : "")
         var views: [NSView] = [Form.section("Default viewer"), Form.note(intro)]
         for category in DefaultApps.categories {
             let check = NSButton(checkboxWithTitle: category.title, target: nil, action: nil)
