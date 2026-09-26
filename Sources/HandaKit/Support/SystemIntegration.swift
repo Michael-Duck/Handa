@@ -113,9 +113,6 @@ enum DefaultApps {
 enum KeepReady {
     static var isOn: Bool { SMAppService.mainApp.status == .enabled }
 
-    /// macOS can hold the login item until it's allowed in System Settings → General → Login Items.
-    static var needsApproval: Bool { SMAppService.mainApp.status == .requiresApproval }
-
     static func set(_ on: Bool) throws {
         if on {
             try SMAppService.mainApp.register()

@@ -361,6 +361,36 @@ final class HandaKitTests: XCTestCase {
         document.close()
     }
 
+    /// Reviews of unsaved edits are filed under the bytes saving would write, so a saved file hashes
+    /// the same as what was reviewed. Unedited, those bytes are the file itself.
+    func testBytesToSaveAreWhatSavingWrites() throws {
+        let files: [(String, Data)] = [
+            ("notes.txt", Data([0xEF, 0xBB, 0xBF] + Array("first\r\nsecond\r\n".utf8))),
+            ("scores.csv", Data("name;score\r\n\"Zoë\";7\r\n".utf8)),
+            ("latin.txt", Data([0x63, 0x61, 0x66, 0xE9, 0x0A])),
+        ]
+        for (name, bytes) in files {
+            let url = temp.appendingPathComponent(name)
+            try bytes.write(to: url)
+            let document = try open(url)
+            XCTAssertEqual(document.bytesToSave(), bytes, name)
+            XCTAssertEqual(document.bytesToSave(), try document.data(ofType: "public.data"), name)
+        }
+    }
+
+    /// A file that quotes only its text fields keeps doing so after edits, so the save changes only
+    /// what was edited.
+    func testTablesKeepTheirQuotingThroughEdits() throws {
+        let url = temp.appendingPathComponent("people.csv")
+        try Data("\"name\",\"city\",age\n\"Zoë\",\"Paris\",31\n\"Sam\",\"Leeds\",28\n".utf8).write(to: url)
+        let document = try open(url)
+        guard case .table(let table) = document.content else { return XCTFail("expected a table") }
+        table.setValue("London", row: 2, column: 1)
+        table.insertColumn(at: 1, values: ["id", "1", "2"])
+        let saved = String(decoding: try document.data(ofType: "public.comma-separated-values-text"), as: UTF8.self)
+        XCTAssertEqual(saved, "\"name\",id,\"city\",age\n\"Zoë\",1,\"Paris\",31\n\"Sam\",2,\"London\",28\n")
+    }
+
     /// Table cells are placed by hand rather than with constraints, so check they fill their column.
     func testTableCellsFillTheirColumns() throws {
         let document = try open(sample("Sales.csv"))

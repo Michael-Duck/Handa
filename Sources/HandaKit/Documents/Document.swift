@@ -204,6 +204,17 @@ final class Document: NSDocument {
     // MARK: Text for AI
 
     /// The document's current text, including unsaved edits. Must be called on the main thread.
+    /// What saving would write right now, worked out without changing anything; nil when it can't be.
+    func bytesToSave() -> Data? {
+        switch content {
+        case .text(let text), .markdown(let text): return text.encoded()
+        case .table(let table): return table.serialized()
+        case .richText(let rich) where rich.format != .rtfd:
+            return try? rich.storage.data(from: NSRange(location: 0, length: rich.storage.length), documentAttributes: rich.writingAttributes)
+        default: return nil
+        }
+    }
+
     func currentText() -> String? {
         switch content {
         case .text(let text), .markdown(let text): return text.string
@@ -250,7 +261,8 @@ final class DocumentController: NSDocumentController {
                 document.makeWindowControllers()
                 document.showWindows()
             }
-            // Open Recent can wait until the file is on screen.
+            // Open Recent can wait until the file is on screen. A plain async block would still run
+            // before the first frame is drawn, hence the short delay.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.noteNewRecentDocument(document) }
             completionHandler(document, false, nil)
         } catch {

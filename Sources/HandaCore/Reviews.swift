@@ -90,7 +90,9 @@ public final class ReviewStore {
             let lock = open(directory.appendingPathComponent(".lock").path, O_CREAT | O_RDWR, 0o644)
             guard lock >= 0 else { return try body() } // Better an unlocked write than a lost review.
             defer { close(lock) }
-            flock(lock, LOCK_EX)
+            // A signal can interrupt the wait; anything else (a network volume without locks, say)
+            // means going ahead unlocked, which is still better than losing the review.
+            while flock(lock, LOCK_EX) != 0, errno == EINTR {}
             defer { flock(lock, LOCK_UN) }
             try body()
         }
@@ -193,7 +195,6 @@ extension JSONDecoder {
     }
 }
 
-/// Lets exactly one of several racing callbacks through.
 /// Reads a pipe to the end on its own thread, so that several pipes can be drained at once.
 final class PipeReader: @unchecked Sendable {
     private var contents = Data()
@@ -213,6 +214,7 @@ final class PipeReader: @unchecked Sendable {
     }
 }
 
+/// A thread-safe yes or no that starts as no.
 final class Flag: @unchecked Sendable {
     private let lock = NSLock()
     private var value = false
@@ -230,6 +232,7 @@ final class Flag: @unchecked Sendable {
     }
 }
 
+/// Lets exactly one of several racing callbacks through.
 final class Once: @unchecked Sendable {
     private let lock = NSLock()
     private var done = false

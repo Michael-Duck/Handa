@@ -38,6 +38,8 @@ final class TableContent {
 
     private(set) var rows: [[String]]
     var format: CSVFormat
+    /// Which fields the file had in quotes, when that doesn't follow from `format` (see CSVParseResult).
+    private(set) var quoted: [UInt64]?
     var encoding: String.Encoding
     var hasHeaderRow: Bool
     private(set) var isTruncated: Bool
@@ -66,6 +68,7 @@ final class TableContent {
         }
         rows = result.rows
         format = result.format
+        quoted = result.quoted
         isLoading = progressive && result.isTruncated
         isTruncated = result.isTruncated && !isLoading
         pendingText = isLoading ? utf8 : nil
@@ -90,6 +93,7 @@ final class TableContent {
             DispatchQueue.main.async {
                 self.rows = result.rows
                 self.format = result.format
+                self.quoted = result.quoted
                 self.isTruncated = result.isTruncated
                 self.isLoading = false
                 self.pendingText = nil
@@ -135,12 +139,15 @@ final class TableContent {
     }
 
     func insertRow(_ row: [String], at index: Int) {
-        rows.insert(row, at: min(max(index, 0), rows.count))
+        let index = min(max(index, 0), rows.count)
+        rows.insert(row, at: index)
+        if let count = quoted?.count { quoted?.insert(0, at: min(index, count)) }
     }
 
     @discardableResult
     func removeRow(at index: Int) -> [String] {
-        rows.remove(at: index)
+        if let count = quoted?.count, index < count { quoted?.remove(at: index) }
+        return rows.remove(at: index)
     }
 
     func insertColumn(at index: Int, values: [String]? = nil) {
@@ -148,6 +155,7 @@ final class TableContent {
             while rows[r].count < index { rows[r].append("") }
             rows[r].insert(values?[safe: r] ?? "", at: min(index, rows[r].count))
         }
+        quoted = quoted?.map { CSV.quoteMask($0, insertingColumnAt: index) }
         columnCount += 1
     }
 
@@ -157,22 +165,23 @@ final class TableContent {
         for r in rows.indices {
             removed.append(index < rows[r].count ? rows[r].remove(at: index) : "")
         }
+        quoted = quoted?.map { CSV.quoteMask($0, removingColumnAt: index) }
         columnCount = rows.reduce(0) { max($0, $1.count) }
         return removed
     }
 
     func serialized() -> Data? {
-        if encoding == .utf8 { return CSV.serialize(rows, format: format) }
+        if encoding == .utf8 { return CSV.serialize(rows, format: format, quoted: quoted) }
         var utf8Format = format
         utf8Format.hasBOM = false
-        let text = String(decoding: CSV.serialize(rows, format: utf8Format), as: UTF8.self)
+        let text = String(decoding: CSV.serialize(rows, format: utf8Format, quoted: quoted), as: UTF8.self)
         return TextDecoding.encode(text, encoding: encoding, hasBOM: format.hasBOM, lineEnding: .lf)
     }
 
     var textForDisplay: String {
         var display = format
         display.hasBOM = false
-        return String(decoding: CSV.serialize(rows, format: display), as: UTF8.self)
+        return String(decoding: CSV.serialize(rows, format: display, quoted: quoted), as: UTF8.self)
     }
 }
 

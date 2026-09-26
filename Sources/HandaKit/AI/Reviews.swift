@@ -46,14 +46,16 @@ final class ReviewCoordinator {
         setState(.running, for: path)
 
         let inMemoryText = document.isDocumentEdited ? document.currentText() : nil
+        // Unsaved edits are what gets reviewed, so file the review under the bytes saving them would
+        // write: that's what the file hashes to once they're saved.
+        let unsavedHash = inMemoryText.map { text in document.bytesToSave().map { StableHash.hex($0) } ?? StableHash.hex(text) }
         let kindName = document.kind.displayName
         let provider = Preferences.reviewProvider
         let model = Preferences.claudeModel
         let command = Preferences.reviewCommand
 
         DispatchQueue.global(qos: .userInitiated).async {
-            // Unsaved edits are what gets reviewed, so they're what the stored hash describes.
-            let hash = inMemoryText.map { StableHash.hex($0) } ?? contentHash ?? ReviewCoordinator.contentHash(of: url)
+            let hash = unsavedHash ?? contentHash ?? ReviewCoordinator.contentHash(of: url)
             let text: String
             do {
                 text = try inMemoryText ?? TextExtractor.extract(url: url).text

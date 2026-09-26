@@ -6,6 +6,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var settings: SettingsWindowController?
     private var escapeMonitor: Any?
     private var preferenceObserver: NSObjectProtocol?
+    /// Set when macOS starts Handa at login to keep it ready: no window, and no taking focus.
+    private var startedAtLogin = false
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         Automation.mark("willFinishLaunching")
@@ -18,6 +20,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Automation.mark("didFinishLaunching")
+        // Only answerable here, while macOS's launch event is still being handled.
+        startedAtLogin = KeepReady.isLoginLaunch
         escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             guard event.keyCode == 53,
                   event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.function).isEmpty,
@@ -29,10 +33,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         AppDelegate.applyAIPreference()
 
-        if #available(macOS 14.0, *) {
-            NSApp.activate()
-        } else {
-            NSApp.activate(ignoringOtherApps: true)
+        if !startedAtLogin {
+            if #available(macOS 14.0, *) {
+                NSApp.activate()
+            } else {
+                NSApp.activate(ignoringOtherApps: true)
+            }
         }
 
         switch Automation.showOnLaunch {
@@ -54,7 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
         // Started at login to keep ready: stay out of the way until a file is opened.
-        if Automation.showOnLaunch == nil, !KeepReady.isLoginLaunch { showWelcome(nil) }
+        if Automation.showOnLaunch == nil, !startedAtLogin, !KeepReady.isLoginLaunch { showWelcome(nil) }
         return false
     }
 

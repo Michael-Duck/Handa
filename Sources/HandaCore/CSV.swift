@@ -54,6 +54,10 @@ public struct CSVParseResult: Sendable {
     public var isTruncated: Bool
     /// Number of input bytes consumed (useful when truncated).
     public var bytesRead: Int
+    /// Which fields were in quotes: one bit per column (the first 64) for each row. Only there when
+    /// the file quotes some fields and not others in a way `format` can't describe, as exporters that
+    /// quote every text field do, so that saving can put the quotes back where they were.
+    public var quoted: [UInt64]? = nil
 }
 
 /// A small, fast, forgiving RFC 4180 reader and writer.
@@ -90,16 +94,22 @@ public enum CSV {
         }
     }
 
-    /// How many records `parse` would find, counted without building them, for sizing up big files.
-    public static func countRecords(_ data: Data, delimiter: UInt8? = nil) -> Int {
-        data.withUnsafeBytes { raw -> Int in
+    /// How many records `parse` would find and how many fields the widest has, worked out without
+    /// building any of them, for sizing up big files. A randomised test keeps this walk in step
+    /// with `parseRows`.
+    public static func measure(_ data: Data, delimiter: UInt8? = nil) -> (records: Int, columns: Int) {
+        data.withUnsafeBytes { raw -> (records: Int, columns: Int) in
             let all = raw.bindMemory(to: UInt8.self)
             let start = all.count >= 3 && all[0] == 0xEF && all[1] == 0xBB && all[2] == 0xBF ? 3 : 0
             let bytes = UnsafeBufferPointer(rebasing: all[start...])
             let delim = delimiter ?? detectDelimiter(bytes)
             let n = bytes.count
-            var i = 0, records = 0
-            // The same walk as parseRows, one field at a time, keeping nothing.
+            var i = 0, records = 0, columns = 0, fields = 1
+            func endRecord() {
+                records += 1
+                columns = max(columns, fields)
+                fields = 1
+            }
             while i < n {
                 if bytes[i] == quote {
                     i += 1
@@ -114,18 +124,19 @@ public enum CSV {
                 }
                 while i < n, bytes[i] != delim, bytes[i] != lf, bytes[i] != cr { i += 1 }
                 if i >= n {
-                    records += 1
+                    endRecord()
                     break
                 }
                 if bytes[i] == delim {
                     i += 1
-                    if i >= n { records += 1 }
+                    fields += 1
+                    if i >= n { endRecord() }
                     continue
                 }
                 if bytes[i] == cr, i + 1 < n, bytes[i + 1] == lf { i += 2 } else { i += 1 }
-                records += 1
+                endRecord()
             }
-            return records
+            return (records, columns)
         }
     }
 
@@ -133,6 +144,8 @@ public enum CSV {
         let n = bytes.count
         var rows: [[String]] = []
         var row: [String] = []
+        var masks: [UInt64] = []
+        var mask: UInt64 = 0
         var field: [UInt8] = []
         var i = 0
         var quoted = 0, unquotedFilled = 0, unquotedEmpty = 0
@@ -165,6 +178,7 @@ public enum CSV {
                     field.append(bytes[i])
                     i += 1
                 }
+                if row.count < 64 { mask |= 1 << UInt64(row.count) }
                 row.append(String(decoding: field, as: UTF8.self))
                 quoted += 1
             } else {
@@ -176,6 +190,8 @@ public enum CSV {
 
             if i >= n {
                 rows.append(row)
+                masks.append(mask)
+                mask = 0
                 row = []
                 break
             }
@@ -186,6 +202,8 @@ public enum CSV {
                     row.append("")
                     unquotedEmpty += 1
                     rows.append(row)
+                    masks.append(mask)
+                    mask = 0
                     row = []
                 }
                 continue
@@ -197,6 +215,8 @@ public enum CSV {
                 i += 1
             }
             rows.append(row)
+            masks.append(mask)
+            mask = 0
             row = []
             if rows.count >= maxRows {
                 truncated = i < n
@@ -217,7 +237,49 @@ public enum CSV {
         let format = CSVFormat(delimiter: delim, lineEnding: lineEnding, hasBOM: false,
                                quoteAllFields: quoteAll, quoteEmptyFields: quoteAll && unquotedEmpty == 0,
                                endsWithNewline: endsWithNewline || n == 0)
-        return CSVParseResult(rows: rows, format: format, isTruncated: truncated, bytesRead: i)
+        var result = CSVParseResult(rows: rows, format: format, isTruncated: truncated, bytesRead: i)
+        // Keep the masks only when the format's rules wouldn't put every quote back where it was.
+        if quoted > 0 {
+            for (r, row) in rows.enumerated() where masks[r] != ruleMask(row, format: format) {
+                result.quoted = masks
+                break
+            }
+        }
+        return result
+    }
+
+    /// Which of a row's first 64 fields `serialize` quotes when it goes by `format` alone.
+    private static func ruleMask(_ row: [String], format: CSVFormat) -> UInt64 {
+        var mask: UInt64 = 0
+        for (c, value) in row.prefix(64).enumerated() where quotesByRule(value.utf8, fieldsInRow: row.count, format: format) {
+            mask |= 1 << UInt64(c)
+        }
+        return mask
+    }
+
+    private static func quotesByRule<Bytes: Collection>(_ bytes: Bytes, fieldsInRow: Int, format: CSVFormat) -> Bool
+        where Bytes.Element == UInt8 {
+        if bytes.isEmpty { return format.quoteEmptyFields && fieldsInRow > 1 }
+        return format.quoteAllFields || mustQuote(bytes, delimiter: format.delimiter)
+    }
+
+    /// True when a field can't be read back the same without quotes.
+    private static func mustQuote<Bytes: Collection>(_ bytes: Bytes, delimiter: UInt8) -> Bool where Bytes.Element == UInt8 {
+        bytes.contains { $0 == delimiter || $0 == quote || $0 == lf || $0 == cr }
+    }
+
+    /// A row's quote mask after a column goes in at `index`: the bits from there up move up one.
+    public static func quoteMask(_ mask: UInt64, insertingColumnAt index: Int) -> UInt64 {
+        guard index < 64 else { return mask }
+        let below = mask & ((1 << UInt64(index)) &- 1)
+        return below | ((mask >> UInt64(index)) << UInt64(index + 1))
+    }
+
+    /// A row's quote mask after the column at `index` goes: the bits above it move down one.
+    public static func quoteMask(_ mask: UInt64, removingColumnAt index: Int) -> UInt64 {
+        guard index < 64 else { return mask }
+        let below = mask & ((1 << UInt64(index)) &- 1)
+        return below | ((mask >> UInt64(index + 1)) << UInt64(index))
     }
 
     /// Picks the delimiter that splits the first lines most consistently.
@@ -262,7 +324,9 @@ public enum CSV {
         return best
     }
 
-    public static func serialize(_ rows: [[String]], format: CSVFormat) -> Data {
+    /// Writes rows back out. `quoted` (from `CSVParseResult`) puts quotes back on the fields that
+    /// had them; without it, `format` decides.
+    public static func serialize(_ rows: [[String]], format: CSVFormat, quoted: [UInt64]? = nil) -> Data {
         var out: [UInt8] = []
         out.reserveCapacity(rows.count * 32)
         if format.hasBOM { out.append(contentsOf: [0xEF, 0xBB, 0xBF]) }
@@ -273,12 +337,12 @@ public enum CSV {
                 if c > 0 { out.append(delim) }
                 let bytes = Array(value.utf8)
                 let needsQuotes: Bool
-                if bytes.isEmpty {
-                    needsQuotes = format.quoteEmptyFields && row.count > 1
-                } else if format.quoteAllFields {
-                    needsQuotes = true
+                if let quoted = quoted {
+                    // As the file had it, plus anything an edit has made necessary.
+                    let wasQuoted = c < 64 && r < quoted.count && quoted[r] & (1 << UInt64(c)) != 0
+                    needsQuotes = wasQuoted || mustQuote(bytes, delimiter: delim)
                 } else {
-                    needsQuotes = bytes.contains { $0 == delim || $0 == quote || $0 == lf || $0 == cr }
+                    needsQuotes = quotesByRule(bytes, fieldsInRow: row.count, format: format)
                 }
                 if needsQuotes {
                     out.append(quote)

@@ -140,19 +140,64 @@ final class CSVTests: XCTestCase {
         XCTAssertLessThan(elapsed, 5, "parsing 100k rows took \(elapsed)s")
     }
 
-    func testCountRecordsMatchesParse() {
-        let cases = ["", "a", "a\n", "a,b\nc,d", "a,b\r\nc,d\r\n", "\"x\ny\",z\nq", "a,\n", "a,", "\n\n",
-                     "\"unterminated\nstill", "\u{FEFF}h1,h2\n1,2\n", "a\rb\rc", "\"a\"\"b\",c\n", "x;y\n1;\"2\n3\"\n"]
-        for text in cases {
+    /// Well-formed CSV comes back byte for byte however its fields were quoted, including files that
+    /// quote only some fields, as many exporters do with text columns.
+    func testQuotingSurvivesARoundTrip() {
+        var random = SeededRandom(seed: 7)
+        let pieces = ["a", "Zoë", "1", "2.5", " ", ",", "\"", "\n", "\r\n", ""]
+        for _ in 0..<3000 {
+            let rowCount = Int.random(in: 1...5, using: &random)
+            let columns = Int.random(in: 1...4, using: &random)
+            let ending = Bool.random(using: &random) ? "\n" : "\r\n"
+            var text = ""
+            for r in 0..<rowCount {
+                var fields: [String] = []
+                for _ in 0..<columns {
+                    let value = (0..<Int.random(in: 0...2, using: &random)).map { _ in pieces.randomElement(using: &random)! }.joined()
+                    let mustQuote = value.contains { $0 == "," || $0 == "\"" || $0 == "\n" || $0 == "\r" || $0 == "\r\n" }
+                    let quoted = mustQuote || Bool.random(using: &random)
+                    fields.append(quoted ? "\"" + value.replacingOccurrences(of: "\"", with: "\"\"") + "\"" : value)
+                }
+                text += fields.joined(separator: ",")
+                if r < rowCount - 1 || Bool.random(using: &random) { text += ending }
+            }
             let data = Data(text.utf8)
-            XCTAssertEqual(CSV.countRecords(data), CSV.parse(data).rows.count, text.debugDescription)
+            let parsed = CSV.parse(data, delimiter: CSV.comma)
+            XCTAssertEqual(CSV.serialize(parsed.rows, format: parsed.format, quoted: parsed.quoted), data, text.debugDescription)
         }
+    }
+
+    func testQuoteMasksFollowColumnEdits() {
+        let mask: UInt64 = 0b1011 // columns 0, 1 and 3 quoted
+        XCTAssertEqual(CSV.quoteMask(mask, insertingColumnAt: 2), 0b10011)
+        XCTAssertEqual(CSV.quoteMask(mask, insertingColumnAt: 0), 0b10110)
+        XCTAssertEqual(CSV.quoteMask(mask, removingColumnAt: 1), 0b101)
+        XCTAssertEqual(CSV.quoteMask(mask, removingColumnAt: 0), 0b101)
+        XCTAssertEqual(CSV.quoteMask(UInt64.max, insertingColumnAt: 63), UInt64.max >> 1)
+        XCTAssertEqual(CSV.quoteMask(mask, insertingColumnAt: 70), mask)
+        // Files that quote by a single rule don't need masks at all.
+        XCTAssertNil(CSV.parse(Data("a,b\n1,2\n".utf8)).quoted)
+        XCTAssertNil(CSV.parse(Data("\"a\",\"b\"\n\"1\",\"2\"\n".utf8)).quoted)
+        XCTAssertNotNil(CSV.parse(Data("\"name\",score\n\"Zoë\",7\n".utf8)).quoted)
+    }
+
+    func testMeasureMatchesParse() {
+        func check(_ data: Data, _ label: String) {
+            let rows = CSV.parse(data).rows
+            let measured = CSV.measure(data)
+            XCTAssertEqual(measured.records, rows.count, label)
+            XCTAssertEqual(measured.columns, rows.map(\.count).max() ?? 0, label)
+        }
+        let cases = ["", "a", "a\n", "a,b\nc,d", "a,b\r\nc,d\r\n", "\"x\ny\",z\nq", "a,\n", "a,", "\n\n",
+                     "\"unterminated\nstill", "\u{FEFF}h1,h2\n1,2\n", "a\rb\rc", "\"a\"\"b\",c\n", "x;y\n1;\"2\n3\"\n",
+                     "a,b\n1,2,3,4\n5"]
+        for text in cases { check(Data(text.utf8), text.debugDescription) }
         // And thousands of random inputs made only of the characters that matter.
         var random = SeededRandom(seed: 42)
         let alphabet = Array("a,\";\n\r".utf8)
         for _ in 0..<5000 {
             let data = Data((0..<Int.random(in: 0...24, using: &random)).map { _ in alphabet.randomElement(using: &random)! })
-            XCTAssertEqual(CSV.countRecords(data), CSV.parse(data).rows.count, String(decoding: data, as: UTF8.self).debugDescription)
+            check(data, String(decoding: data, as: UTF8.self).debugDescription)
         }
     }
 }

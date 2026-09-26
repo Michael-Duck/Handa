@@ -151,9 +151,10 @@ private final class GeneralSettings: NSViewController {
         views.append(Form.section("Opening files"))
         views.append(Form.checkbox("Open files ready to edit (instead of as a preview)", Preferences.openInEditMode, self, #selector(toggleEditMode(_:))))
         views.append(Form.checkbox("Close previews with the Esc key", Preferences.escClosesPreview, self, #selector(toggleEsc(_:))))
-        views.append(Form.checkbox("Keep Handa ready in the background, so files open instantly", KeepReady.isOn || KeepReady.needsApproval,
-                                   self, #selector(toggleKeepReady(_:))))
-        keepReadyNote = Form.note(KeepReady.needsApproval ? GeneralSettings.approvalNote : GeneralSettings.keepReadyNote)
+        let loginItem = SMAppService.mainApp.status
+        views.append(Form.checkbox("Keep Handa ready in the background, so files open instantly",
+                                   loginItem == .enabled || loginItem == .requiresApproval, self, #selector(toggleKeepReady(_:))))
+        keepReadyNote = Form.note(loginItem == .requiresApproval ? GeneralSettings.approvalNote : GeneralSettings.keepReadyNote)
         views.append(keepReadyNote)
         Form.install(Form.stack(views), in: self)
         refresh()
@@ -193,14 +194,22 @@ private final class GeneralSettings: NSViewController {
     private static let approvalNote = "Almost there: allow Handa in System Settings → General → Login Items."
 
     @objc private func toggleKeepReady(_ sender: NSButton) {
+        var failure: Error?
         do {
             try KeepReady.set(sender.state == .on)
-            keepReadyNote.stringValue = KeepReady.needsApproval ? GeneralSettings.approvalNote : GeneralSettings.keepReadyNote
-            if KeepReady.needsApproval { SMAppService.openSystemSettingsLoginItems() }
         } catch {
-            keepReadyNote.stringValue = "macOS didn't allow that: \(error.localizedDescription)"
+            failure = error // Often just macOS wanting approval first, which the status below shows.
         }
-        sender.state = KeepReady.isOn || KeepReady.needsApproval ? .on : .off
+        let loginItem = SMAppService.mainApp.status
+        if loginItem == .requiresApproval {
+            keepReadyNote.stringValue = GeneralSettings.approvalNote
+            SMAppService.openSystemSettingsLoginItems()
+        } else if let failure = failure {
+            keepReadyNote.stringValue = "macOS didn't allow that: \(failure.localizedDescription)"
+        } else {
+            keepReadyNote.stringValue = GeneralSettings.keepReadyNote
+        }
+        sender.state = loginItem == .enabled || loginItem == .requiresApproval ? .on : .off
     }
 
     @objc private func toggleEditMode(_ sender: NSButton) { Preferences.openInEditMode = sender.state == .on }
