@@ -38,8 +38,8 @@ public struct Review: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-/// Stores reviews as one small JSON file per reviewed file. Safe to use from several processes:
-/// every write re-reads the file first and replaces it atomically.
+/// Stores reviews as one small JSON file per reviewed file. Safe to use from several processes (the
+/// app and the MCP server): every change holds a lock file, re-reads, and replaces the file atomically.
 public final class ReviewStore {
     public let directory: URL
     private let queue = DispatchQueue(label: "handa.reviews")
@@ -62,7 +62,7 @@ public final class ReviewStore {
     }
 
     public func add(_ review: Review, for path: String) throws {
-        try queue.sync {
+        try changing {
             var entry = load(path) ?? Entry(path: path, reviews: [])
             entry.reviews.append(review)
             // Keep the history short; old reviews rarely matter.
@@ -72,7 +72,7 @@ public final class ReviewStore {
     }
 
     public func remove(id: String, for path: String) throws {
-        try queue.sync {
+        try changing {
             guard var entry = load(path) else { return }
             entry.reviews.removeAll { $0.id == id }
             if entry.reviews.isEmpty {
@@ -80,6 +80,19 @@ public final class ReviewStore {
             } else {
                 try save(entry)
             }
+        }
+    }
+
+    /// Runs a read-change-write with an exclusive lock that other processes respect too.
+    private func changing(_ body: () throws -> Void) throws {
+        try queue.sync {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let lock = open(directory.appendingPathComponent(".lock").path, O_CREAT | O_RDWR, 0o644)
+            guard lock >= 0 else { return try body() } // Better an unlocked write than a lost review.
+            defer { close(lock) }
+            flock(lock, LOCK_EX)
+            defer { flock(lock, LOCK_UN) }
+            try body()
         }
     }
 
@@ -181,6 +194,42 @@ extension JSONDecoder {
 }
 
 /// Lets exactly one of several racing callbacks through.
+/// Reads a pipe to the end on its own thread, so that several pipes can be drained at once.
+final class PipeReader: @unchecked Sendable {
+    private var contents = Data()
+    private let finished = DispatchSemaphore(value: 0)
+
+    init(_ handle: FileHandle) {
+        DispatchQueue.global().async {
+            self.contents = handle.readDataToEndOfFile()
+            self.finished.signal()
+        }
+    }
+
+    /// Waits for the end of the pipe. Call it once.
+    func data() -> Data {
+        finished.wait()
+        return contents
+    }
+}
+
+final class Flag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+
+    func set() {
+        lock.lock()
+        value = true
+        lock.unlock()
+    }
+
+    var isSet: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+}
+
 final class Once: @unchecked Sendable {
     private let lock = NSLock()
     private var done = false
@@ -201,19 +250,30 @@ final class Once: @unchecked Sendable {
 public enum CommandRunner {
     public enum RunError: Error, LocalizedError {
         case failed(status: Int32, output: String)
+        case crashed(signal: Int32, output: String)
         case timedOut
         case emptyOutput
 
         public var errorDescription: String? {
             switch self {
             case .failed(let status, let output):
-                let detail = output.trimmingCharacters(in: .whitespacesAndNewlines)
-                return "The review command exited with status \(status)" + (detail.isEmpty ? "." : ": \(detail.prefix(400))")
+                return "The review command exited with status \(status)" + RunError.detail(output)
+            case .crashed(let signal, let output):
+                return "The review command stopped unexpectedly (signal \(signal))" + RunError.detail(output)
             case .timedOut: return "The review command took too long and was stopped."
             case .emptyOutput: return "The review command didn't print anything."
             }
         }
+
+        private static func detail(_ output: String) -> String {
+            let detail = output.trimmingCharacters(in: .whitespacesAndNewlines)
+            return detail.isEmpty ? "." : ": \(detail.suffix(400))"
+        }
     }
+
+    /// Writing to a command that has stopped reading raises SIGPIPE, whose default is to end the
+    /// whole app. Ignoring it turns that into an ordinary write error instead.
+    private static let ignoreBrokenPipes: Void = { _ = signal(SIGPIPE, SIG_IGN) }()
 
     public static func shellQuote(_ value: String) -> String {
         "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
@@ -263,6 +323,7 @@ public enum CommandRunner {
             if once.claim() { completion(result) }
         }
 
+        _ = ignoreBrokenPipes
         do {
             try process.run()
         } catch {
@@ -271,18 +332,22 @@ public enum CommandRunner {
         }
 
         DispatchQueue.global().async {
-            stdin.fileHandleForWriting.write(Data(input.utf8))
+            // A command may stop reading early; its exit status says whether that mattered.
+            try? stdin.fileHandleForWriting.write(contentsOf: Data(input.utf8))
             try? stdin.fileHandleForWriting.close()
         }
+        // Drain both pipes at once. Waiting on one while the command fills the other would hang.
+        let output = PipeReader(stdout.fileHandleForReading)
+        let errors = PipeReader(stderr.fileHandleForReading)
+        let timedOut = Flag()
         DispatchQueue.global().async {
-            let output = stdout.fileHandleForReading.readDataToEndOfFile()
-            let errors = stderr.fileHandleForReading.readDataToEndOfFile()
+            let text = String(decoding: output.data(), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+            let problems = String(decoding: errors.data(), as: UTF8.self)
             process.waitUntilExit()
-            let text = String(decoding: output, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
             if process.terminationReason == .uncaughtSignal {
-                finish(.failure(RunError.timedOut))
+                finish(.failure(timedOut.isSet ? RunError.timedOut : RunError.crashed(signal: process.terminationStatus, output: problems)))
             } else if process.terminationStatus != 0 {
-                finish(.failure(RunError.failed(status: process.terminationStatus, output: String(decoding: errors, as: UTF8.self))))
+                finish(.failure(RunError.failed(status: process.terminationStatus, output: problems)))
             } else if text.isEmpty {
                 finish(.failure(RunError.emptyOutput))
             } else {
@@ -291,6 +356,7 @@ public enum CommandRunner {
         }
         DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
             guard process.isRunning else { return }
+            timedOut.set()
             process.terminate()
             // Child processes can keep the pipes open, so report the timeout without waiting for them.
             finish(.failure(RunError.timedOut))

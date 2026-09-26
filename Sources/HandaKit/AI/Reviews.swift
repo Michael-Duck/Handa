@@ -52,7 +52,8 @@ final class ReviewCoordinator {
         let command = Preferences.reviewCommand
 
         DispatchQueue.global(qos: .userInitiated).async {
-            let hash = contentHash ?? ReviewCoordinator.contentHash(of: url)
+            // Unsaved edits are what gets reviewed, so they're what the stored hash describes.
+            let hash = inMemoryText.map { StableHash.hex($0) } ?? contentHash ?? ReviewCoordinator.contentHash(of: url)
             let text: String
             do {
                 text = try inMemoryText ?? TextExtractor.extract(url: url).text

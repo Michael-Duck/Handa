@@ -139,4 +139,35 @@ final class CSVTests: XCTestCase {
         XCTAssertEqual(result.rows.last, ["99999", "Name 99999", "149998.5"])
         XCTAssertLessThan(elapsed, 5, "parsing 100k rows took \(elapsed)s")
     }
+
+    func testCountRecordsMatchesParse() {
+        let cases = ["", "a", "a\n", "a,b\nc,d", "a,b\r\nc,d\r\n", "\"x\ny\",z\nq", "a,\n", "a,", "\n\n",
+                     "\"unterminated\nstill", "\u{FEFF}h1,h2\n1,2\n", "a\rb\rc", "\"a\"\"b\",c\n", "x;y\n1;\"2\n3\"\n"]
+        for text in cases {
+            let data = Data(text.utf8)
+            XCTAssertEqual(CSV.countRecords(data), CSV.parse(data).rows.count, text.debugDescription)
+        }
+        // And thousands of random inputs made only of the characters that matter.
+        var random = SeededRandom(seed: 42)
+        let alphabet = Array("a,\";\n\r".utf8)
+        for _ in 0..<5000 {
+            let data = Data((0..<Int.random(in: 0...24, using: &random)).map { _ in alphabet.randomElement(using: &random)! })
+            XCTAssertEqual(CSV.countRecords(data), CSV.parse(data).rows.count, String(decoding: data, as: UTF8.self).debugDescription)
+        }
+    }
+}
+
+/// A tiny SplitMix64, so random tests run the same way every time.
+struct SeededRandom: RandomNumberGenerator {
+    private var state: UInt64
+
+    init(seed: UInt64) { state = seed }
+
+    mutating func next() -> UInt64 {
+        state &+= 0x9E37_79B9_7F4A_7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+        return z ^ (z >> 31)
+    }
 }

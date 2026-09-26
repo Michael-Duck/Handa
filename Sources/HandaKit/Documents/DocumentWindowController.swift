@@ -63,7 +63,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         window.contentViewController = split
         Automation.mark("splitReady")
 
-        let toolbar = NSToolbar(identifier: "HandaDocumentToolbar.\(document.kind.category.rawValue)")
+        // One identifier per window: AppKit keeps toolbars that share an identifier in step, and two
+        // windows of the same kind can have different buttons.
+        let toolbar = NSToolbar(identifier: "HandaDocumentToolbar.\(UUID().uuidString)")
         toolbar.delegate = self
         toolbar.displayMode = .iconOnly
         toolbar.allowsUserCustomization = false

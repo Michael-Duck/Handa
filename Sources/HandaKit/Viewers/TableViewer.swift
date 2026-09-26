@@ -107,24 +107,30 @@ final class TableViewer: Viewer, NSTableViewDataSource, NSTableViewDelegate, NST
             }
         }
         if let column = sortColumn {
-            let numeric = numericColumns.contains(column)
+            let cells = rows.map { content.value(row: $0, column: column) }
+            let numbers = numericColumns.contains(column) ? cells.map { NumberParsing.number(from: $0) } : nil
             let ascending = sortAscending
-            rows.sort { a, b in
-                let left = content.value(row: a, column: column), right = content.value(row: b, column: column)
-                let ordered: Bool
-                if numeric, let l = NumberParsing.number(from: left), let r = NumberParsing.number(from: right) {
-                    ordered = l < r
-                } else if left == right {
-                    return a < b
-                } else {
-                    ordered = left.localizedStandardCompare(right) == .orderedAscending
-                }
-                return ascending ? ordered : !ordered
+            let order = cells.indices.sorted { a, b in
+                let result = TableViewer.compare(cells[a], cells[b], numbers?[a], numbers?[b])
+                // Equal cells keep the file's order, whichever way the column is sorted.
+                if result == .orderedSame { return a < b }
+                return (result == .orderedAscending) == ascending
             }
+            rows = order.map { rows[$0] }
         }
         visibleRows = rows
         tableView.reloadData()
         statusChanged()
+    }
+
+    /// Numbers in number order and ahead of any text, which goes in Finder's order.
+    static func compare(_ left: String, _ right: String, _ leftNumber: Double?, _ rightNumber: Double?) -> ComparisonResult {
+        switch (leftNumber, rightNumber) {
+        case let (l?, r?): return l < r ? .orderedAscending : l > r ? .orderedDescending : .orderedSame
+        case (_?, nil): return .orderedAscending
+        case (nil, _?): return .orderedDescending
+        case (nil, nil): return left.localizedStandardCompare(right)
+        }
     }
 
     // MARK: Data source

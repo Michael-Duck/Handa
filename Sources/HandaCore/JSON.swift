@@ -235,6 +235,9 @@ public enum JSON: Equatable, Sendable {
                 case UInt8(ascii: "u"):
                     var scalar = try hex4()
                     if (0xD800...0xDBFF).contains(scalar) {
+                        // A high surrogate needs a low one straight after it. Without one it becomes
+                        // U+FFFD, and whatever follows is read as usual.
+                        let next = index
                         if index + 6 <= bytes.count, bytes[index] == UInt8(ascii: "\\"), bytes[index + 1] == UInt8(ascii: "u") {
                             index += 2
                             let low = try hex4()
@@ -242,6 +245,7 @@ public enum JSON: Equatable, Sendable {
                                 scalar = 0x10000 + ((scalar - 0xD800) << 10) + (low - 0xDC00)
                             } else {
                                 scalar = 0xFFFD
+                                index = next
                             }
                         } else {
                             scalar = 0xFFFD

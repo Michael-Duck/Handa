@@ -26,15 +26,24 @@ public enum TextDecoding {
 
         if data.starts(with: [0xEF, 0xBB, 0xBF]) {
             hasBOM = true
-            raw = String(decoding: data.dropFirst(3), as: UTF8.self)
-        } else if data.starts(with: [0xFF, 0xFE]) {
+            let body = data.dropFirst(3)
+            if let utf8 = String(data: body, encoding: .utf8) {
+                raw = utf8
+            } else {
+                // Some Windows tools put a UTF-8 BOM in front of text that isn't UTF-8. Read the rest
+                // byte for byte so nothing is lost; saving writes the BOM back in front.
+                (raw, encoding) = singleByte(body)
+            }
+        } else if data.starts(with: [0xFF, 0xFE]), data.count % 2 == 0,
+                  let utf16 = String(data: data.dropFirst(2), encoding: .utf16LittleEndian) {
             hasBOM = true
             encoding = .utf16LittleEndian
-            raw = String(data: data.dropFirst(2), encoding: .utf16LittleEndian)
-        } else if data.starts(with: [0xFE, 0xFF]) {
+            raw = utf16
+        } else if data.starts(with: [0xFE, 0xFF]), data.count % 2 == 0,
+                  let utf16 = String(data: data.dropFirst(2), encoding: .utf16BigEndian) {
             hasBOM = true
             encoding = .utf16BigEndian
-            raw = String(data: data.dropFirst(2), encoding: .utf16BigEndian)
+            raw = utf16
         } else if let guess = utf16Guess(data), let utf16 = String(data: data, encoding: guess) {
             // Checked before UTF-8 because zero bytes are technically valid UTF-8.
             encoding = guess
@@ -44,18 +53,20 @@ public enum TextDecoding {
         }
 
         if raw == nil {
-            if let latin = String(data: data, encoding: .windowsCP1252) {
-                encoding = .windowsCP1252
-                raw = latin
-            } else {
-                encoding = .isoLatin1
-                raw = String(data: data, encoding: .isoLatin1) ?? String(decoding: data, as: UTF8.self)
-            }
+            (raw, encoding) = singleByte(data)
         }
 
         let text = raw ?? ""
         let lineEnding = detectLineEnding(text)
         return DecodedText(text: normalizeLineEndings(text), encoding: encoding, hasBOM: hasBOM, lineEnding: lineEnding)
+    }
+
+    /// Windows Latin 1, or ISO Latin 1 for the few bytes Windows leaves undefined. Every byte maps
+    /// to a character and back again, so nothing is lost on save.
+    private static func singleByte<Bytes: DataProtocol>(_ bytes: Bytes) -> (String, String.Encoding) {
+        let data = Data(bytes)
+        if let text = String(data: data, encoding: .windowsCP1252) { return (text, .windowsCP1252) }
+        return (String(data: data, encoding: .isoLatin1) ?? String(decoding: data, as: UTF8.self), .isoLatin1)
     }
 
     /// Encodes text for saving, restoring the original line endings and BOM.
@@ -66,10 +77,10 @@ public enum TextDecoding {
         var data = Data()
         if hasBOM {
             switch encoding {
-            case .utf8: data.append(contentsOf: [0xEF, 0xBB, 0xBF])
             case .utf16LittleEndian: data.append(contentsOf: [0xFF, 0xFE])
             case .utf16BigEndian: data.append(contentsOf: [0xFE, 0xFF])
-            default: break
+            // UTF-8, or a UTF-8 BOM that came in front of single-byte text.
+            default: data.append(contentsOf: [0xEF, 0xBB, 0xBF])
             }
         }
         data.append(bytes)

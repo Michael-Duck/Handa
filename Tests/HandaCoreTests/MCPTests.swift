@@ -31,6 +31,14 @@ final class JSONTests: XCTestCase {
     }
 }
 
+extension JSONTests {
+    func testLoneHighSurrogateKeepsTheNextCharacter() throws {
+        XCTAssertEqual(try JSON.parse(Data(#""\uD800\u0041""#.utf8)).string, "\u{FFFD}A")
+        XCTAssertEqual(try JSON.parse(Data(#""\uD83D\uDE00!""#.utf8)).string, "😀!")
+        XCTAssertEqual(try JSON.parse(Data(#""\uD800x""#.utf8)).string, "\u{FFFD}x")
+    }
+}
+
 final class MCPServerTests: XCTestCase {
     private func makeServer() -> MCPServer {
         let echo = MCPTool(name: "echo", title: "Echo", description: "Echoes text",
@@ -173,6 +181,16 @@ final class ReviewTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: store.fileURL(for: path).path))
     }
 
+    /// Two stores stand in for the app and the MCP server writing at the same moment: every review
+    /// has to survive, which only a lock shared between processes can promise.
+    func testStoresWritingAtOnceKeepEveryReview() throws {
+        let stores = [ReviewStore(directory: directory), ReviewStore(directory: directory)]
+        DispatchQueue.concurrentPerform(iterations: 20) { i in
+            try? stores[i % 2].add(Review(title: "\(i)", body: "", source: "t"), for: "/shared.csv")
+        }
+        XCTAssertEqual(Set(stores[0].reviews(for: "/shared.csv").map(\.title)).count, 20)
+    }
+
     func testStoreKeepsHistoryShort() throws {
         let store = ReviewStore(directory: directory)
         for i in 0..<25 { try store.add(Review(title: "\(i)", body: "", source: "t", createdAt: Date(timeIntervalSince1970: Double(i))), for: "/x") }
@@ -279,6 +297,40 @@ final class UtilityTests: XCTestCase {
             slow.fulfill()
         }
         wait(for: [done, failed, slow], timeout: 10)
+    }
+
+    /// A command may stop reading its input early. That must not take the app down with it.
+    func testCommandThatIgnoresItsInput() {
+        let done = expectation(description: "command finished")
+        CommandRunner.run("echo ok", input: String(repeating: "x", count: 2_000_000), shell: "/bin/sh") { result in
+            XCTAssertEqual(try? result.get(), "ok")
+            done.fulfill()
+        }
+        wait(for: [done], timeout: 10)
+    }
+
+    /// Plenty of stderr, more than a pipe holds, must not leave the review waiting forever.
+    func testCommandWithChattyStderr() {
+        let done = expectation(description: "command finished")
+        let chatter = "i=0; while [ $i -lt 3000 ]; do echo 'working on it, still working on it, nearly there' >&2; i=$((i+1)); done; echo done"
+        CommandRunner.run(chatter, input: "", shell: "/bin/sh", timeout: 30) { result in
+            XCTAssertEqual(try? result.get(), "done")
+            done.fulfill()
+        }
+        wait(for: [done], timeout: 20)
+    }
+
+    /// A command that crashes is reported as a crash, not as taking too long.
+    func testCommandThatCrashes() {
+        let done = expectation(description: "crash reported")
+        CommandRunner.run("echo about to fall over >&2; kill -SEGV $$", input: "", shell: "/bin/sh") { result in
+            guard case .failure(let error) = result else { return XCTFail("expected a failure") }
+            XCTAssertFalse(error.localizedDescription.contains("too long"), error.localizedDescription)
+            XCTAssertTrue(error.localizedDescription.contains("signal 11"), error.localizedDescription)
+            XCTAssertTrue(error.localizedDescription.contains("about to fall over"), error.localizedDescription)
+            done.fulfill()
+        }
+        wait(for: [done], timeout: 10)
     }
 }
 

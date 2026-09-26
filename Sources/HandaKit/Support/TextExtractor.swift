@@ -37,10 +37,13 @@ enum TextExtractor {
         case .table:
             let data = try Data(contentsOf: url, options: .mappedIfSafe)
             let decoded = TextDecoding.decode(data)
-            let parsed = CSV.parse(Data(decoded.text.utf8))
-            let columns = parsed.rows.map(\.count).max() ?? 0
+            // Only the first rows are parsed; the rest are counted, which is far cheaper on big files.
+            let utf8 = decoded.encoding == .utf8 ? data : Data(decoded.text.utf8)
+            let head = CSV.parse(utf8, maxRows: 1_000)
+            let columns = head.rows.map(\.count).max() ?? 0
+            let rows = head.isTruncated ? CSV.countRecords(utf8, delimiter: head.format.delimiter) : head.rows.count
             return Extraction(text: decoded.text, kind: kind.displayName,
-                              details: "\(Formatting.count(parsed.rows.count, "row")), \(Formatting.count(columns, "column")), \(sizeText)")
+                              details: "\(Formatting.count(rows, "row")), \(Formatting.count(columns, "column")), \(sizeText)")
         case .markdown, .text:
             let data = try Data(contentsOf: url, options: .mappedIfSafe)
             if url.pathExtension.lowercased() == "plist", data.starts(with: Array("bplist".utf8)) {

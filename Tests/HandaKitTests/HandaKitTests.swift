@@ -309,6 +309,58 @@ final class HandaKitTests: XCTestCase {
         document.close()
     }
 
+    /// Two windows of the same kind can have different buttons (HTML has a view switch, plain text
+    /// doesn't). Turning AI off and on must leave each toolbar with its own buttons.
+    func testToolbarsOfTheSameKindStayIndependent() throws {
+        let html = temp.appendingPathComponent("page.html")
+        try Data("<p>Hello</p>".utf8).write(to: html)
+        let text = temp.appendingPathComponent("notes.txt")
+        try Data("Hello".utf8).write(to: text)
+        let wasOn = Preferences.aiEnabled
+        defer { Preferences.aiEnabled = wasOn }
+        Preferences.aiEnabled = true
+        let documents = try [html, text].map { try open($0) }
+        documents.forEach { $0.makeWindowControllers() }
+        let toolbars = try documents.map { try XCTUnwrap($0.windowController?.window?.toolbar) }
+        XCTAssertNotEqual(toolbars[0].items.count, toolbars[1].items.count, "the HTML window has the view switch")
+        let before = toolbars.map { $0.items.map(\.itemIdentifier) }
+
+        Preferences.aiEnabled = false
+        for toolbar in toolbars {
+            XCTAssertFalse(toolbar.items.contains { $0.itemIdentifier == .handaReview })
+            XCTAssertTrue(toolbar.items.contains { $0.itemIdentifier == .handaShare })
+        }
+        Preferences.aiEnabled = true
+        XCTAssertEqual(toolbars.map { $0.items.map(\.itemIdentifier) }, before)
+        for document in documents {
+            document.windowController?.window?.close()
+            document.close()
+        }
+    }
+
+    /// Numbers sort as numbers ahead of text, and equal values ("1" and "1.0") keep the file's order
+    /// both ways round.
+    func testTableSortsNumbersAndTiesConsistently() throws {
+        let url = temp.appendingPathComponent("scores.csv")
+        try Data("name,score\na,10\nb,n/a\nc,9\nd,1\ne,1.0\n".utf8).write(to: url)
+        let document = try open(url)
+        document.makeWindowControllers()
+        let viewer = try XCTUnwrap(document.windowController?.viewer as? TableViewer)
+        let table = try XCTUnwrap(viewer.tableView)
+        func names() -> [String] {
+            let column = table.tableColumns[1]
+            return (0..<table.numberOfRows).map { row in
+                (viewer.tableView(table, viewFor: column, row: row) as? NSTableCellView)?.textField?.stringValue ?? ""
+            }
+        }
+        table.sortDescriptors = [NSSortDescriptor(key: "c1", ascending: true)]
+        XCTAssertEqual(names(), ["d", "e", "c", "a", "b"])
+        table.sortDescriptors = [NSSortDescriptor(key: "c1", ascending: false)]
+        XCTAssertEqual(names(), ["b", "a", "c", "d", "e"])
+        document.windowController?.window?.close()
+        document.close()
+    }
+
     /// Table cells are placed by hand rather than with constraints, so check they fill their column.
     func testTableCellsFillTheirColumns() throws {
         let document = try open(sample("Sales.csv"))

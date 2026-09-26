@@ -44,6 +44,26 @@ final class TextDecodingTests: XCTestCase {
         XCTAssertEqual(TextDecoding.encode(decoded.text, encoding: decoded.encoding, hasBOM: false, lineEnding: .lf), data)
     }
 
+    /// A UTF-8 BOM in front of Windows Latin 1 text, as some Windows exports have. Nothing may be
+    /// replaced with U+FFFD, and saving an unedited file must give back the same bytes.
+    func testUTF8BOMInFrontOfWindowsLatin1() {
+        let data = Data([0xEF, 0xBB, 0xBF] + Array("Zo".utf8) + [0xEB] + Array(",caf".utf8) + [0xE9, 0x0D, 0x0A])
+        let decoded = TextDecoding.decode(data)
+        XCTAssertEqual(decoded.text, "Zoë,café\n")
+        XCTAssertEqual(decoded.encoding, .windowsCP1252)
+        XCTAssertTrue(decoded.hasBOM)
+        XCTAssertFalse(decoded.text.contains("\u{FFFD}"))
+        XCTAssertEqual(TextDecoding.encode(decoded.text, encoding: decoded.encoding, hasBOM: decoded.hasBOM, lineEnding: decoded.lineEnding), data)
+    }
+
+    /// A UTF-16 BOM with an odd number of bytes after it isn't UTF-16, so keep every byte as it is.
+    func testBrokenUTF16BOMKeepsEveryByte() {
+        let data = Data([0xFF, 0xFE, 0x41])
+        let decoded = TextDecoding.decode(data)
+        XCTAssertFalse(decoded.hasBOM)
+        XCTAssertEqual(TextDecoding.encode(decoded.text, encoding: decoded.encoding, hasBOM: decoded.hasBOM, lineEnding: decoded.lineEnding), data)
+    }
+
     func testEncodeFailsForUnrepresentableCharacters() {
         XCTAssertNil(TextDecoding.encode("emoji 🙂", encoding: .isoLatin1, hasBOM: false, lineEnding: .lf))
     }

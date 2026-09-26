@@ -90,6 +90,45 @@ public enum CSV {
         }
     }
 
+    /// How many records `parse` would find, counted without building them, for sizing up big files.
+    public static func countRecords(_ data: Data, delimiter: UInt8? = nil) -> Int {
+        data.withUnsafeBytes { raw -> Int in
+            let all = raw.bindMemory(to: UInt8.self)
+            let start = all.count >= 3 && all[0] == 0xEF && all[1] == 0xBB && all[2] == 0xBF ? 3 : 0
+            let bytes = UnsafeBufferPointer(rebasing: all[start...])
+            let delim = delimiter ?? detectDelimiter(bytes)
+            let n = bytes.count
+            var i = 0, records = 0
+            // The same walk as parseRows, one field at a time, keeping nothing.
+            while i < n {
+                if bytes[i] == quote {
+                    i += 1
+                    while i < n {
+                        if bytes[i] == quote {
+                            if i + 1 < n, bytes[i + 1] == quote { i += 2; continue }
+                            break
+                        }
+                        i += 1
+                    }
+                    if i < n { i += 1 }
+                }
+                while i < n, bytes[i] != delim, bytes[i] != lf, bytes[i] != cr { i += 1 }
+                if i >= n {
+                    records += 1
+                    break
+                }
+                if bytes[i] == delim {
+                    i += 1
+                    if i >= n { records += 1 }
+                    continue
+                }
+                if bytes[i] == cr, i + 1 < n, bytes[i + 1] == lf { i += 2 } else { i += 1 }
+                records += 1
+            }
+            return records
+        }
+    }
+
     private static func parseRows(_ bytes: UnsafeBufferPointer<UInt8>, delimiter delim: UInt8, maxRows: Int) -> CSVParseResult {
         let n = bytes.count
         var rows: [[String]] = []

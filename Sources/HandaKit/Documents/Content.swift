@@ -49,7 +49,7 @@ final class TableContent {
         let delimiter: UInt8? = forceTab ? CSV.tab : nil
         let utf8: Data
         var decoded: DecodedText?
-        if data.starts(with: [0xEF, 0xBB, 0xBF]) || TextDecoding.isValidUTF8(data) {
+        if TextDecoding.isValidUTF8(data) {
             utf8 = data
             encoding = .utf8
         } else {
