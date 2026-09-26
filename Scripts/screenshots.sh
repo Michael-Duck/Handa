@@ -1,6 +1,7 @@
 #!/bin/bash
 # Takes the README screenshots from the real app. Used by CI; also works locally.
-# Needs screen recording permission for the terminal running it.
+# Needs screen recording permission for the terminal running it. Scroll bars are the overlay kind a
+# trackpad gets, whatever the machine is set to.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -44,7 +45,8 @@ shot() {
   local extra=(${APP_ARGS:-})
   # bash 3.2 on macOS treats empty arrays as unset under set -u, hence the ${x+…} dance.
   env HANDA_READY_FILE="$ready" HANDA_WINDOW_SIZE="${SIZE:-1180x760}" "$@" \
-    "$BIN" ${args[@]+"${args[@]}"} ${extra[@]+"${extra[@]}"} -ApplePersistenceIgnoreState YES >"$WORK/$name.log" 2>&1 &
+    "$BIN" ${args[@]+"${args[@]}"} ${extra[@]+"${extra[@]}"} -ApplePersistenceIgnoreState YES \
+    -AppleShowScrollBars WhenScrolling >"$WORK/$name.log" 2>&1 &
   local pid=$!
   for _ in $(seq 1 150); do [ -f "$ready" ] && break; sleep 0.1; done
   if [ ! -f "$ready" ]; then
