@@ -46,7 +46,7 @@ jobs:
         run: Scripts/smoke-test.sh
 
       - name: Screenshots
-        if: matrix.os == 'macos-26'
+        if: ${{ !cancelled() && matrix.os == 'macos-26' }}
         timeout-minutes: 10
         run: Scripts/screenshots.sh
 
@@ -59,7 +59,7 @@ jobs:
           path: build/Handa.zip
 
       - uses: actions/upload-artifact@v7
-        if: matrix.os == 'macos-26'
+        if: ${{ !cancelled() && matrix.os == 'macos-26' }}
         with:
           name: screenshots
           path: |

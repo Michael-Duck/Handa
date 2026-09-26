@@ -10,7 +10,8 @@ public enum HandaApp {
       Handa [file …]          Open files in Handa
       Handa extract <file …>  Print the text inside PDFs, Word documents, CSVs and more
       Handa mcp               Run Handa's MCP server over stdio (for Claude and other assistants)
-      Handa make-default      Make Handa the default app for PDFs, Word, CSV, Markdown, text and images
+      Handa make-default      Make Handa the default app for PDF, Word, CSV, Markdown and text files
+                              (add --all for older Word formats, TSV, JSON, logs, code and images too)
       Handa --version
     """
 
@@ -23,7 +24,7 @@ public enum HandaApp {
         case "extract":
             exit(extract(Array(arguments.dropFirst())))
         case "make-default":
-            exit(makeDefault())
+            exit(makeDefault(all: arguments.contains("--all")))
         case "--version", "-v":
             print(AppInfo.version)
             exit(0)
@@ -64,26 +65,33 @@ public enum HandaApp {
         return status
     }
 
-    private static func makeDefault() -> Int32 {
-        var finished = false
-        var failures: [Error] = []
-        DefaultApps.makeDefault(DefaultApps.categories) { errors in
-            failures = errors
-            finished = true
+    private static func makeDefault(all: Bool) -> Int32 {
+        setvbuf(stdout, nil, _IOLBF, 0) // show progress as it happens, even through a pipe
+        let categories = all ? DefaultApps.categories : DefaultApps.essentials
+        let count = categories.flatMap(\.types).count
+        if DefaultApps.asksToConfirm {
+            print("macOS will ask you to confirm each of the \(count) file types.")
         }
-        let deadline = Date().addingTimeInterval(30)
+        var finished = false
+        var failures = 0
+        DefaultApps.makeDefault(categories, progress: { type, error in
+            let name = type.preferredFilenameExtension.map { "." + $0 } ?? type.identifier
+            if let error = error {
+                failures += 1
+                print("\(name): not changed (\(error.localizedDescription))")
+            } else {
+                print("\(name): Handa")
+            }
+        }, completion: { _ in finished = true })
+        // Leave time to answer macOS's questions when it asks them.
+        let deadline = Date().addingTimeInterval(DefaultApps.asksToConfirm ? 180 : 30)
         while !finished, Date() < deadline {
             RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.05))
         }
         if !finished {
-            print("Timed out waiting for macOS.")
-            return 1
+            print("Stopped waiting for macOS. Anything you confirm from now on still takes effect.")
+            return 2
         }
-        if failures.isEmpty {
-            print("Handa is now the default app for PDFs, Word documents, CSV, Markdown, text, code and images.")
-            return 0
-        }
-        print("Some file types couldn't be changed: \(failures.map(\.localizedDescription).joined(separator: "; "))")
-        return 1
+        return failures == 0 ? 0 : 1
     }
 }

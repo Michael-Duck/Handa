@@ -120,6 +120,7 @@ final class ImageViewer: Viewer {
 /// Everything else macOS can preview: video, audio, spreadsheets, presentations, 3D, fonts…
 final class QuickLookViewer: Viewer {
     private var preview: QLPreviewView?
+    private var isClosed = false
 
     override func loadView() {
         guard let preview = QLPreviewView(frame: NSRect(x: 0, y: 0, width: 900, height: 700), style: .normal) else {
@@ -137,8 +138,9 @@ final class QuickLookViewer: Viewer {
         guard let preview = preview, preview.previewItem == nil, let url = document.fileURL else { return }
         // Quick Look can take a while to start (most of a second for a first Word file), so the
         // window goes up first and the preview follows on the next pass of the run loop.
-        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(1)) {
-            guard preview.window != nil else { return } // closed or replaced in the meantime
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(1)) { [weak self] in
+            // A closed QLPreviewView aborts if it's given something to show.
+            guard let self = self, !self.isClosed else { return }
             preview.previewItem = url as NSURL
         }
     }
@@ -146,6 +148,7 @@ final class QuickLookViewer: Viewer {
     override var preferredFirstResponder: NSView? { preview }
 
     override func tearDown() {
+        isClosed = true
         preview?.close()
     }
 

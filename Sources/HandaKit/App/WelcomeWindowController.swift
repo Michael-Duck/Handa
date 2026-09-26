@@ -123,7 +123,7 @@ final class WelcomeWindowController: NSWindowController, NSTableViewDataSource, 
         root.addSubview(emptyLabel)
 
         // Default app card
-        defaultLabel = NSTextField(wrappingLabelWithString: "Open PDFs, Word documents, CSV, Markdown, text and images with Handa by default?")
+        defaultLabel = NSTextField(wrappingLabelWithString: "Open PDF, Word, CSV, Markdown and text files with Handa when you double-click them?")
         defaultLabel.font = .systemFont(ofSize: 12)
         let makeDefault = NSButton(title: "Make Default", target: self, action: #selector(makeDefault(_:)))
         makeDefault.bezelStyle = .rounded
@@ -192,8 +192,8 @@ final class WelcomeWindowController: NSWindowController, NSTableViewDataSource, 
     }
 
     private func updateDefaultCard() {
-        let everything = DefaultApps.categories.allSatisfy(DefaultApps.isHandaDefault(for:))
-        defaultCard?.isHidden = everything || Preferences.offeredDefaultApp
+        let done = DefaultApps.essentials.allSatisfy(DefaultApps.isHandaDefault(for:))
+        defaultCard?.isHidden = done || Preferences.offeredDefaultApp
     }
 
     // MARK: Actions
@@ -223,11 +223,14 @@ final class WelcomeWindowController: NSWindowController, NSTableViewDataSource, 
 
     @objc private func makeDefault(_ sender: Any?) {
         Preferences.offeredDefaultApp = true
-        DefaultApps.makeDefault(DefaultApps.categories) { [weak self] errors in
-            self?.defaultButtons.isHidden = true
+        defaultButtons.isHidden = true
+        if DefaultApps.asksToConfirm {
+            defaultLabel.stringValue = "macOS will ask you to confirm each file type."
+        }
+        DefaultApps.makeDefault(DefaultApps.essentials) { [weak self] errors in
             self?.defaultLabel.stringValue = errors.isEmpty
-                ? "Done. Handa now opens these files when you double-click them."
-                : "macOS didn't accept every change (\(errors.count) failed). You can try again in Settings."
+                ? "Done. Handa now opens these files. Images, code and more are in Settings."
+                : "\(errors.count) file type(s) weren't changed. You can try again in Settings."
         }
     }
 

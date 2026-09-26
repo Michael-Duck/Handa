@@ -26,23 +26,41 @@ enum FolderNavigator {
 enum DefaultApps {
     struct Category {
         let title: String
+        /// ".doc, .rtf, .odt" and so on, shown next to the title.
+        let extensions: String
         let types: [UTType]
+        /// Part of the short list that Make Default changes. From macOS 26.4 every file type needs
+        /// its own confirmation, so the short list sticks to the files people open most.
+        var isEssential = false
     }
 
     static let categories: [Category] = [
-        Category(title: "PDF documents", types: [.pdf]),
-        Category(title: "Word and rich text documents", types: [
-            UTType("org.openxmlformats.wordprocessingml.document"), UTType("com.microsoft.word.doc"),
-            .rtf, .rtfd, UTType("org.oasis-open.opendocument.text"),
+        Category(title: "PDF", extensions: ".pdf", types: [.pdf], isEssential: true),
+        Category(title: "Word", extensions: ".docx", types: [UTType("org.openxmlformats.wordprocessingml.document")].compactMap { $0 },
+                 isEssential: true),
+        Category(title: "CSV", extensions: ".csv", types: [.commaSeparatedText], isEssential: true),
+        Category(title: "Markdown", extensions: ".md", types: [UTType(importedAs: "net.daringfireball.markdown", conformingTo: .plainText)],
+                 isEssential: true),
+        Category(title: "Plain text", extensions: ".txt", types: [.plainText], isEssential: true),
+        Category(title: "Older Word, RTF and OpenDocument", extensions: ".doc, .rtf, .rtfd, .odt", types: [
+            UTType("com.microsoft.word.doc"), .rtf, .rtfd, UTType("org.oasis-open.opendocument.text"),
         ].compactMap { $0 }),
-        Category(title: "CSV and TSV tables", types: [.commaSeparatedText, .tabSeparatedText]),
-        Category(title: "Markdown", types: [UTType("net.daringfireball.markdown")].compactMap { $0 }),
-        Category(title: "Plain text and code", types: [
-            .plainText, .json, .xml, .yaml, .log, .swiftSource, .pythonScript, .shellScript, .javaScript,
-            .cSource, .cPlusPlusSource, .cHeader, .rubyScript, .perlScript, .phpScript,
+        Category(title: "TSV", extensions: ".tsv", types: [.tabSeparatedText]),
+        Category(title: "JSON, XML, YAML and logs", extensions: ".json, .xml, .yaml, .log", types: [.json, .xml, .yaml, .log]),
+        Category(title: "Source code", extensions: ".swift, .py, .sh, .js, .c, .cpp, .h, .rb, .pl, .php", types: [
+            .swiftSource, .pythonScript, .shellScript, .javaScript, .cSource, .cPlusPlusSource, .cHeader,
+            .rubyScript, .perlScript, .phpScript,
         ]),
-        Category(title: "Images", types: [.png, .jpeg, .gif, .heic, .tiff, .webP, .bmp]),
+        Category(title: "Images", extensions: ".png, .jpg, .heic, .gif, .webp, .tiff, .bmp",
+                 types: [.png, .jpeg, .heic, .gif, .webP, .tiff, .bmp]),
     ]
+
+    static var essentials: [Category] { categories.filter(\.isEssential) }
+
+    /// macOS 26.4 and later ask the user to confirm every change of default app, one file type at a time.
+    static var asksToConfirm: Bool {
+        ProcessInfo.processInfo.isOperatingSystemAtLeast(OperatingSystemVersion(majorVersion: 26, minorVersion: 4, patchVersion: 0))
+    }
 
     static var appURL: URL { Bundle.main.bundleURL }
 
@@ -50,10 +68,13 @@ enum DefaultApps {
         category.types.first.flatMap { NSWorkspace.shared.urlForApplication(toOpen: $0) }
     }
 
+    /// True when Handa opens every file type in the category.
     static func isHandaDefault(for category: Category) -> Bool {
-        guard let current = currentApp(for: category) else { return false }
-        return current.standardizedFileURL.resolvingSymlinksInPath() == appURL.standardizedFileURL.resolvingSymlinksInPath()
-            || Bundle(url: current)?.bundleIdentifier == Bundle.main.bundleIdentifier
+        category.types.allSatisfy { type in
+            guard let current = NSWorkspace.shared.urlForApplication(toOpen: type) else { return false }
+            return current.standardizedFileURL.resolvingSymlinksInPath() == appURL.standardizedFileURL.resolvingSymlinksInPath()
+                || Bundle(url: current)?.bundleIdentifier == Bundle.main.bundleIdentifier
+        }
     }
 
     static func appName(for url: URL?) -> String {
@@ -61,23 +82,24 @@ enum DefaultApps {
         return FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
     }
 
-    /// Makes Handa the default for every type in the given categories.
-    static func makeDefault(_ categories: [Category], completion: @escaping ([Error]) -> Void) {
-        let group = DispatchGroup()
-        let lock = NSLock()
+    /// Makes Handa the default for every type in the given categories. Goes one type at a time, so
+    /// when macOS asks for confirmation the questions come one after another. Calls back on the main queue.
+    static func makeDefault(_ categories: [Category], progress: ((UTType, Error?) -> Void)? = nil,
+                            completion: @escaping ([Error]) -> Void) {
+        var remaining = categories.flatMap(\.types)
         var errors: [Error] = []
-        for type in categories.flatMap(\.types) {
-            group.enter()
+        func next() {
+            guard !remaining.isEmpty else { return completion(errors) }
+            let type = remaining.removeFirst()
             NSWorkspace.shared.setDefaultApplication(at: appURL, toOpen: type) { error in
-                if let error = error {
-                    lock.lock()
-                    errors.append(error)
-                    lock.unlock()
+                DispatchQueue.main.async {
+                    if let error = error { errors.append(error) }
+                    progress?(type, error)
+                    next()
                 }
-                group.leave()
             }
         }
-        group.notify(queue: .main) { completion(errors) }
+        next()
     }
 }
 

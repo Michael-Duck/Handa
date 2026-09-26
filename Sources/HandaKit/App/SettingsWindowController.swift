@@ -95,11 +95,17 @@ private final class GeneralSettings: NSViewController {
     private var result: NSTextField!
 
     override func loadView() {
-        var views: [NSView] = [Form.section("Default viewer"),
-                               Form.note("Choose which files open in Handa when you double-click them in Finder.")]
+        let intro = "Choose which files open in Handa when you double-click them in Finder."
+            + (DefaultApps.asksToConfirm ? " macOS asks you to confirm each file type." : "")
+        var views: [NSView] = [Form.section("Default viewer"), Form.note(intro)]
         for category in DefaultApps.categories {
             let check = NSButton(checkboxWithTitle: category.title, target: nil, action: nil)
-            check.state = .on
+            let title = NSMutableAttributedString(string: category.title, attributes: [.font: NSFont.systemFont(ofSize: 13)])
+            title.append(NSAttributedString(string: "  " + category.extensions, attributes: [
+                .font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor,
+            ]))
+            check.attributedTitle = title
+            check.state = category.isEssential || DefaultApps.isHandaDefault(for: category) ? .on : .off
             let label = NSTextField(labelWithString: "")
             label.font = .systemFont(ofSize: 11)
             label.textColor = .secondaryLabelColor
@@ -144,9 +150,9 @@ private final class GeneralSettings: NSViewController {
     @objc private func makeDefault(_ sender: Any?) {
         let chosen = DefaultApps.categories.enumerated().filter { checks[$0.offset].state == .on }.map(\.element)
         guard !chosen.isEmpty else { return }
-        result.stringValue = "Updating…"
-        DefaultApps.makeDefault(chosen) { [weak self] errors in
-            self?.result.stringValue = errors.isEmpty ? "Done." : "\(errors.count) type(s) couldn't be changed."
+        result.stringValue = DefaultApps.asksToConfirm ? "Waiting for you to confirm in macOS…" : "Updating…"
+        DefaultApps.makeDefault(chosen, progress: { [weak self] _, _ in self?.refresh() }) { [weak self] errors in
+            self?.result.stringValue = errors.isEmpty ? "Done." : "\(errors.count) file type(s) weren't changed."
             Preferences.offeredDefaultApp = true
             self?.refresh()
         }

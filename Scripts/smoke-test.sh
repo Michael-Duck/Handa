@@ -25,6 +25,45 @@ diagnose() {
   kill -9 "$1" 2>/dev/null || true
 }
 
+# Prints the newest crash report macOS wrote for Handa during this run, if there is one.
+touch "$WORK/started"
+crash_report() {
+  local report=""
+  for _ in $(seq 1 20); do
+    report=$(find "$HOME/Library/Logs/DiagnosticReports" -name 'Handa*' -newer "$WORK/started" 2>/dev/null | sort | tail -1)
+    [ -n "$report" ] && break
+    sleep 0.5
+  done
+  if [ -z "$report" ]; then echo "(no crash report)"; return; fi
+  echo "--- crash report $(basename "$report") ---"
+  python3 - "$report" <<'PY'
+import json, sys
+text = open(sys.argv[1]).read()
+try:
+    report = json.loads(text.partition("\n")[2])
+except ValueError:
+    print(text[:6000])
+    sys.exit()
+print("exception:", json.dumps(report.get("exception")))
+for key in ("asi", "ktriageinfo"):
+    if key in report:
+        print(key + ":", json.dumps(report[key])[:3000])
+images = report.get("usedImages", [])
+def show(frames):
+    for frame in frames[:40]:
+        index = frame.get("imageIndex")
+        image = images[index].get("name", "?") if index is not None and index < len(images) else "?"
+        print(f"  {image:30} {frame.get('symbol', hex(frame.get('imageOffset', 0)))}")
+if "lastExceptionBacktrace" in report:
+    print("last exception backtrace:")
+    show(report["lastExceptionBacktrace"])
+for thread in report.get("threads", []):
+    if thread.get("triggered"):
+        print("crashed thread:")
+        show(thread.get("frames", []))
+PY
+}
+
 # A few extra files the samples don't cover.
 head -c 4096 /dev/urandom > "$WORK/random.bin"
 printf 'plain text\nwith two lines\n' > "$WORK/notes.txt"
@@ -57,6 +96,7 @@ launch() {
   elif ! wait "$pid"; then
     fail "$(basename "$file"): app exited with an error"
     cat "$WORK/app.log"
+    crash_report
   fi
   if [ "$kind" != "$expect" ]; then fail "$(basename "$file"): opened as $kind, expected $expect"; fi
   printf '%-24s %-10s %6s ms\n' "$(basename "$file")" "$kind" "$ms" | tee -a "$RESULTS"
@@ -110,6 +150,7 @@ PY
 else
   fail "warm open benchmark wrote no results"
   cat "$WORK/app.log"
+  crash_report
 fi
 
 echo
@@ -154,15 +195,52 @@ function run(argv) {
   return app.isNil() ? "nothing" : ObjC.unwrap($.NSBundle.bundleWithURL(app).bundleIdentifier)
 }
 JS
-if "$BIN" make-default; then
-  for f in "Quarterly Report.pdf" "Team Meeting.docx" "Sales.csv" "Opening Checklist.md" "inventory.py" "Harbor.png"; do
-    owner=$(osascript -l JavaScript "$WORK/opens-with.js" "$PWD/Samples/$f" 2>&1 || true)
-    [ "$owner" = "io.github.michael-duck.handa" ] || fail "$f opens with $owner, not Handa"
-  done
-  echo "make-default: ok"
+asks_to_confirm() { sw_vers -productVersion | awk -F. '{ if ($1 > 26 || ($1 == 26 && $2 >= 4)) print "yes"; else print "no" }'; }
+if [ "$(asks_to_confirm)" = no ]; then
+  if "$BIN" make-default --all >"$WORK/make-default.log" 2>&1; then
+    for f in "Quarterly Report.pdf" "Team Meeting.docx" "Sales.csv" "Opening Checklist.md" "inventory.py" "Harbor.png" "recipes.json"; do
+      owner=$(osascript -l JavaScript "$WORK/opens-with.js" "$PWD/Samples/$f" 2>&1 || true)
+      [ "$owner" = "io.github.michael-duck.handa" ] || fail "$f opens with $owner, not Handa"
+    done
+    echo "make-default: ok, $(grep -c ': Handa' "$WORK/make-default.log") file types"
+  else
+    cat "$WORK/make-default.log"
+    fail "make-default"
+  fi
 else
-  fail "make-default"
+  # macOS 26.4 and later ask the user to confirm each file type, which nobody can do here. Check
+  # Handa asks, and keep a picture of what macOS shows.
+  cat > "$WORK/windows.js" <<'JS'
+ObjC.import("CoreGraphics")
+function run() {
+  const windows = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(17, 0))) || []
+  const lines = windows.filter(w => w.kCGWindowLayer >= 0 && w.kCGWindowOwnerName !== "Dock")
+    .map(w => `${w.kCGWindowOwnerName} layer ${w.kCGWindowLayer}: "${w.kCGWindowName || ""}" ${Math.round(w.kCGWindowBounds.Width)}x${Math.round(w.kCGWindowBounds.Height)}`)
+  const events = Application("System Events")
+  for (const name of [...new Set(windows.map(w => w.kCGWindowOwnerName))]) {
+    try {
+      for (const window of events.processes.byName(name).windows()) {
+        lines.push(`${name}: "${window.name()}" buttons: ${window.buttons.name().join(", ")}; text: ${window.staticTexts.value().join(" / ")}`)
+      }
+    } catch (error) { lines.push(`${name}: ${error}`) }
+  }
+  return lines.join("\n")
+}
+JS
+  "$BIN" make-default >"$WORK/make-default.log" 2>&1 &
+  pid=$!
+  sleep 8
+  mkdir -p build/screenshots/debug
+  screencapture -x build/screenshots/debug/make-default.png 2>/dev/null || true
+  osascript -l JavaScript "$WORK/windows.js" 2>&1 | head -40 || true
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  cat "$WORK/make-default.log"
+  grep -q "confirm each of the 5 file types" "$WORK/make-default.log" || fail "make-default should say macOS asks to confirm"
+  echo "make-default: asks macOS, which wants the user to confirm each type on this version"
 fi
+
+{ echo "Launch to first window:"; cat "$RESULTS"; echo; echo "Open while running:"; cat "$WORK/warm-open.txt"; } > build/launch-times.txt 2>/dev/null || true
 
 echo
 if [ "$failures" -gt 0 ]; then
@@ -170,4 +248,3 @@ if [ "$failures" -gt 0 ]; then
   exit 1
 fi
 echo "All smoke tests passed."
-{ echo "Launch to first window:"; cat "$RESULTS"; echo; echo "Open while running:"; cat "$WORK/warm-open.txt"; } > build/launch-times.txt 2>/dev/null || true

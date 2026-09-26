@@ -42,7 +42,7 @@ cd Handa
 make install
 ```
 
-That puts Handa in Applications and makes it the app that opens PDFs, Word files, CSVs, Markdown, text, code and images when you double-click them. To choose which, open **Settings → General**.
+That puts Handa in Applications and makes it the app that opens PDF, Word, CSV, Markdown and text files when you double-click them. macOS 26.4 and later ask you to confirm each file type. Images, code and more can be added in **Settings → General**.
 
 Prefer a download? Tagged versions come with a `Handa.zip` on the [Releases](https://github.com/Michael-Duck/Handa/releases) page, and Handa offers to become your default viewer the first time you open it. The app isn't notarised, so macOS will stop it at first: open **System Settings → Privacy & Security** and click **Open Anyway**.
 
@@ -70,7 +70,7 @@ AI is off until you turn it on in **Settings → AI**, and even then a file is o
 ```sh
 Handa extract report.pdf   # print the text of a PDF, Word file, CSV and more
 Handa mcp                  # run the MCP server
-Handa make-default         # make Handa the default for common file types
+Handa make-default         # open PDF, Word, CSV, Markdown and text with Handa (--all for more)
 ```
 
 `Handa` lives at `/Applications/Handa.app/Contents/MacOS/Handa`.

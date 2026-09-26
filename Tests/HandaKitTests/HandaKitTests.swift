@@ -331,6 +331,19 @@ final class HandaKitTests: XCTestCase {
         document.close()
     }
 
+    func testDefaultAppChoices() {
+        // macOS 26.4 and later ask to confirm each file type, so Make Default keeps to five.
+        XCTAssertEqual(DefaultApps.essentials.map(\.title), ["PDF", "Word", "CSV", "Markdown", "Plain text"])
+        XCTAssertEqual(DefaultApps.essentials.flatMap(\.types).count, 5)
+        XCTAssertTrue(DefaultApps.essentials.map(\.extensions).contains(".pdf"))
+        let all = DefaultApps.categories.flatMap(\.types)
+        XCTAssertEqual(Set(all).count, all.count, "no file type is listed twice")
+        for category in DefaultApps.categories {
+            XCTAssertFalse(category.types.isEmpty, category.title)
+            XCTAssertFalse(category.extensions.isEmpty, category.title)
+        }
+    }
+
     // MARK: MCP
 
     func testMCPToolsOnRealFiles() throws {
