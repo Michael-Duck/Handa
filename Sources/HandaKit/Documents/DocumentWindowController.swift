@@ -23,7 +23,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     private let split = NSSplitViewController()
     private var reviewItem: NSSplitViewItem?
     private var reviewPanel: ReviewPanelController?
-    private var autoSwitchedToSource = false
+    /// The view to return to when editing ends, if editing had to switch views.
+    private var modeBeforeEditing: ViewMode?
     private weak var editItem: NSToolbarItem?
     private weak var modeGroup: NSToolbarItemGroup?
     private weak var searchItem: NSSearchToolbarItem?
@@ -37,7 +38,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         Automation.mark("windowControllerStart")
         handaDocument = document
         let modes = ViewMode.modes(for: document.kind)
-        mode = Automation.initialMode.flatMap { modes.contains($0) ? $0 : nil } ?? .standard
+        mode = Automation.initialMode.flatMap { modes.contains($0) ? $0 : nil } ?? modes[0]
         viewer = DocumentWindowController.makeViewer(for: document, mode: mode)
 
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 700),
@@ -47,10 +48,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         window.tabbingMode = .automatic
         window.tabbingIdentifier = "HandaDocument"
         window.minSize = NSSize(width: 460, height: 320)
-        window.animationBehavior = .documentWindow
+        // No zoom-in animation: the file should simply be there.
+        window.animationBehavior = .none
         window.isReleasedWhenClosed = false
         window.subtitle = document.kind.displayName
         super.init(window: window)
+        Automation.mark("windowCreated")
 
         window.delegate = self
         split.splitView.dividerStyle = .thin
@@ -58,14 +61,17 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         main.minimumThickness = 360
         split.addSplitViewItem(main)
         window.contentViewController = split
+        Automation.mark("splitReady")
 
         let toolbar = NSToolbar(identifier: "HandaDocumentToolbar.\(document.kind.category.rawValue)")
         toolbar.delegate = self
         toolbar.displayMode = .iconOnly
         toolbar.allowsUserCustomization = false
         window.toolbar = toolbar
+        Automation.mark("toolbarSet")
 
         installViewer(viewer)
+        Automation.mark("viewerInstalled")
         window.setContentSize(defaultContentSize())
         position(window)
 
@@ -75,7 +81,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         if Preferences.openInEditMode || Automation.startEditing, document.supportsEditing {
             setEditing(true, confirmed: true)
         }
-        if Automation.showReviews { toggleReviews(nil) }
+        if Automation.showReviews {
+            toggleReviews(nil)
+            reviewItem?.isCollapsed = false
+        }
         if Automation.showSidebar, viewer.supportsSidebar { viewer.toggleSidebar() }
         Automation.mark("windowControllerEnd")
     }
@@ -140,11 +149,28 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
 
     /// Called after the file was reloaded from disk or reverted.
     func documentDidReload() {
+        // Keep the reader's place, and stay pinned to the end when following a growing file like a log.
+        let oldScroll = findScrollView(in: viewer.view)
+        let origin = oldScroll?.contentView.bounds.origin
+        let wasAtEnd = oldScroll.map { scroll -> Bool in
+            guard let document = scroll.documentView else { return false }
+            return scroll.contentView.bounds.maxY >= document.frame.height - 4
+        } ?? false
+
         if !handaDocument.supportsEditing { isEditingEnabled = false }
-        if !modes.contains(mode) { mode = .standard }
+        if !modes.contains(mode) { mode = modes[0] }
         window?.subtitle = kind.displayName
         installViewer(DocumentWindowController.makeViewer(for: handaDocument, mode: mode))
         reviewPanel?.reload()
+
+        guard let origin = origin, let scroll = findScrollView(in: viewer.view) else { return }
+        DispatchQueue.main.async {
+            guard let document = scroll.documentView else { return }
+            let maxY = max(0, document.frame.height - scroll.contentView.bounds.height)
+            let y = wasAtEnd ? maxY : min(origin.y, maxY)
+            scroll.contentView.scroll(to: NSPoint(x: origin.x, y: y))
+            scroll.reflectScrolledClipView(scroll.contentView)
+        }
     }
 
     /// Something about the document changed that affects the toolbar (loading finished, PDF unlocked…).
@@ -181,20 +207,22 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
                 }
                 return
             }
-            if kind.category == .markdown, mode == .standard {
-                autoSwitchedToSource = true
+            // Some views can't be edited: rendered Markdown, Quick Look pages, a table's raw text.
+            let editableMode: ViewMode? = kind.category == .markdown
+                ? (mode == .source ? nil : .source)
+                : (mode == .standard ? nil : .standard)
+            if let target = editableMode {
+                modeBeforeEditing = mode
                 isEditingEnabled = true
-                setMode(.source)
-            } else if mode == .quickLook || (kind.category == .table && mode == .source) {
-                isEditingEnabled = true
-                setMode(.standard)
+                setMode(target)
             }
         }
         isEditingEnabled = editing
         viewer.setEditing(editing)
-        if !editing, autoSwitchedToSource {
-            autoSwitchedToSource = false
-            setMode(.standard)
+        // Go back to the view the file was in, unless it would hide unsaved edits (Quick Look shows the saved file).
+        if !editing, let previous = modeBeforeEditing {
+            modeBeforeEditing = nil
+            if previous != .quickLook || !handaDocument.isDocumentEdited { setMode(previous) }
         }
         updateEditItem()
         updateStatus()
@@ -404,7 +432,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             reviewItem = item
             reviewPanel = panel
         }
-        reviewItem?.animator().isCollapsed.toggle()
+        guard let item = reviewItem else { return }
+        if Automation.showReviews {
+            item.isCollapsed.toggle()
+        } else {
+            item.animator().isCollapsed.toggle()
+        }
     }
 
     @objc func reviewWithAI(_ sender: Any?) {
@@ -488,6 +521,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     }
 
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        defer { Automation.mark("item " + identifier.rawValue) }
         switch identifier {
         case .handaMode:
             let titles = modes.map { $0.title(for: kind) }

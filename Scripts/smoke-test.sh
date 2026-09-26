@@ -43,6 +43,10 @@ launch() {
   python3 -c 'import json,sys; p=json.load(open(sys.argv[1])).get("phases",{}); print("    " + "  ".join(f"{k} {v:g}" for k,v in sorted(p.items(), key=lambda x: x[1])))' "$ready"
 }
 
+# The first launch of a new build pays one-off costs (code signature checks, Launch Services
+# registration, font caches), so warm up once and then measure.
+RESULTS=/dev/null launch "$WORK/notes.txt" text >/dev/null
+
 echo "Launch to first window:"
 launch "Samples/Quarterly Report.pdf" pdf
 launch "Samples/Team Meeting.docx" richText

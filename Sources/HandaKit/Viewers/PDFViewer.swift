@@ -50,7 +50,12 @@ final class PDFViewer: Viewer, PDFViewDelegate {
         split.dividerStyle = .thin
         split.addArrangedSubview(thumbnails)
         split.addArrangedSubview(pdfView)
-        split.setHoldingPriority(.defaultHigh, forSubviewAt: 0)
+        split.setHoldingPriority(NSLayoutConstraint.Priority(260), forSubviewAt: 0)
+        split.setHoldingPriority(NSLayoutConstraint.Priority(240), forSubviewAt: 1)
+        let width = thumbnails.widthAnchor.constraint(equalToConstant: 150)
+        width.priority = NSLayoutConstraint.Priority(255)
+        width.isActive = true
+        thumbnails.widthAnchor.constraint(greaterThanOrEqualToConstant: 100).isActive = true
         thumbnails.isHidden = true
         view = split
 
@@ -71,7 +76,6 @@ final class PDFViewer: Viewer, PDFViewDelegate {
     override func toggleSidebar() {
         sidebarVisible.toggle()
         thumbnails.isHidden = !sidebarVisible
-        if sidebarVisible { split.setPosition(150, ofDividerAt: 0) }
         split.adjustSubviews()
     }
 

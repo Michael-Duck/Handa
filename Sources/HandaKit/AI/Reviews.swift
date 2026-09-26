@@ -156,7 +156,8 @@ final class ReviewPanelController: NSViewController {
                              target: self, action: #selector(clearReviews(_:)))
         clear.isBordered = false
         clear.toolTip = "Delete all reviews of this file"
-        title.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        title.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
+        for button in [clear, review] { button.setContentHuggingPriority(.required, for: .horizontal) }
         let header = NSStackView(views: [title, clear, review])
         header.distribution = .fill
         header.spacing = 8

@@ -183,7 +183,10 @@ final class WelcomeWindowController: NSWindowController, NSTableViewDataSource, 
     }
 
     private func reloadRecent() {
-        recent = NSDocumentController.shared.recentDocumentURLs.filter { FileManager.default.fileExists(atPath: $0.path) }
+        let temporary = ["/private/var/folders/", "/var/folders/", "/private/tmp/", "/tmp/"]
+        recent = NSDocumentController.shared.recentDocumentURLs.filter { url in
+            FileManager.default.fileExists(atPath: url.path) && !temporary.contains { url.path.hasPrefix($0) }
+        }
         tableView?.reloadData()
         emptyLabel?.isHidden = !recent.isEmpty
     }

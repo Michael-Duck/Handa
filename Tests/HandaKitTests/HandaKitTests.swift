@@ -205,7 +205,7 @@ final class HandaKitTests: XCTestCase {
 
     func testEveryViewerLoads() throws {
         let expected: [String: Viewer.Type] = [
-            "Quarterly Report.pdf": PDFViewer.self, "Team Meeting.docx": RichTextViewer.self, "Sales.csv": TableViewer.self,
+            "Quarterly Report.pdf": PDFViewer.self, "Team Meeting.docx": QuickLookViewer.self, "Sales.csv": TableViewer.self,
             "Opening Checklist.md": MarkdownViewer.self, "inventory.py": TextViewer.self, "recipes.json": TextViewer.self,
             "Harbor.png": ImageViewer.self, "Budget.xlsx": QuickLookViewer.self,
         ]
@@ -235,6 +235,33 @@ final class HandaKitTests: XCTestCase {
         controller.setMode(.source)
         XCTAssertEqual(controller.mode, .source)
         controller.window?.close()
+        document.close()
+    }
+
+    func testWordPreviewsOriginalAndEditsAsText() throws {
+        let url = try copyOfSample("Team Meeting.docx")
+        let document = try open(url)
+        document.makeWindowControllers()
+        let controller = try XCTUnwrap(document.windowController)
+        XCTAssertEqual(controller.mode, .quickLook, "Word files open in their original layout")
+        XCTAssertTrue(controller.viewer is QuickLookViewer)
+        controller.setEditing(true, confirmed: true)
+        XCTAssertTrue(controller.viewer is RichTextViewer, "editing uses Handa's text view")
+        XCTAssertTrue(controller.isEditingEnabled)
+        controller.setEditing(false)
+        XCTAssertTrue(controller.viewer is QuickLookViewer, "and goes back when nothing changed")
+        XCTAssertEqual(DocumentKind.detect(url: url).category, .richText)
+        controller.window?.close()
+        document.close()
+    }
+
+    func testRTFStaysNative() throws {
+        let url = temp.appendingPathComponent("letter.rtf")
+        try Data(#"{\rtf1\ansi{\fonttbl\f0 Helvetica;}\f0 Hello \b there\b0.}"#.utf8).write(to: url)
+        let document = try open(url)
+        document.makeWindowControllers()
+        XCTAssertTrue(document.windowController?.viewer is RichTextViewer)
+        document.windowController?.window?.close()
         document.close()
     }
 

@@ -7,7 +7,8 @@ final class ImageViewer: Viewer {
     private let info: ImageInfo
     private var scrollView: NSScrollView!
     private var imageView: NSImageView!
-    private var didFit = false
+    /// Keeps the image fitted to the window until the user zooms themselves.
+    private var fitsWindow = true
 
     init(document: Document, info: ImageInfo) {
         self.info = info
@@ -54,13 +55,15 @@ final class ImageViewer: Viewer {
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        if !didFit, scrollView.contentView.bounds.width > 10 {
-            didFit = true
-            zoomToFit(nil)
+        if fitsWindow, scrollView.frame.width > 10 {
+            setMagnification(fitMagnification, userInitiated: false)
         }
     }
 
-    @objc private func magnified() { statusChanged() }
+    @objc private func magnified() {
+        fitsWindow = false
+        statusChanged()
+    }
 
     private var fitMagnification: CGFloat {
         let available = scrollView.frame.size
@@ -69,13 +72,18 @@ final class ImageViewer: Viewer {
         return min(1, min((available.width - 24) / size.width, (available.height - 24) / size.height))
     }
 
-    override func zoomIn(_ sender: Any?) { setMagnification(scrollView.magnification * 1.25) }
-    override func zoomOut(_ sender: Any?) { setMagnification(scrollView.magnification / 1.25) }
-    override func zoomToActualSize(_ sender: Any?) { setMagnification(1) }
-    override func zoomToFit(_ sender: Any?) { setMagnification(fitMagnification) }
+    override func zoomIn(_ sender: Any?) { setMagnification(scrollView.magnification * 1.25, userInitiated: true) }
+    override func zoomOut(_ sender: Any?) { setMagnification(scrollView.magnification / 1.25, userInitiated: true) }
+    override func zoomToActualSize(_ sender: Any?) { setMagnification(1, userInitiated: true) }
+    override func zoomToFit(_ sender: Any?) {
+        fitsWindow = true
+        setMagnification(fitMagnification, userInitiated: false)
+    }
 
-    private func setMagnification(_ value: CGFloat) {
+    private func setMagnification(_ value: CGFloat, userInitiated: Bool) {
+        if userInitiated { fitsWindow = false }
         let clamped = min(max(value, scrollView.minMagnification), scrollView.maxMagnification)
+        guard userInitiated || abs(clamped - scrollView.magnification) > 0.001 else { return }
         scrollView.setMagnification(clamped, centeredAt: NSPoint(x: imageView.frame.midX, y: imageView.frame.midY))
         statusChanged()
     }
@@ -132,7 +140,8 @@ final class QuickLookViewer: Viewer {
     }
 
     override var statusText: String {
-        "\(document.kind.displayName) · \(Formatting.bytes(document.fileSize)) · Preview"
+        let layout = document.kind.category == .richText || document.kind.category == .text ? " · Original layout, from Quick Look" : ""
+        return "\(document.kind.displayName) · \(Formatting.bytes(document.fileSize))\(layout)"
     }
 }
 

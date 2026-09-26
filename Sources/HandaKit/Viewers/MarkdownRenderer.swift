@@ -301,12 +301,18 @@ enum MarkdownRenderer {
             lastAttributes.removeValue(forKey: .backgroundColor)
         }
 
+        /// Quotes, code blocks and headings sit in a one-cell table. A bare NSTextBlock shrinks to its
+        /// narrowest width; a table cell at 100% spans the column and keeps its padding inside.
         private mutating func block(_ identity: Int, configure: (NSTextBlock) -> Void) -> NSTextBlock {
             if let existing = blocks[identity] { return existing }
-            let block = NSTextBlock()
-            configure(block)
-            blocks[identity] = block
-            return block
+            let table = NSTextTable()
+            table.numberOfColumns = 1
+            table.layoutAlgorithm = .automaticLayoutAlgorithm
+            table.setContentWidth(100, type: .percentageValueType)
+            let cell = NSTextTableBlock(table: table, startingRow: 0, rowSpan: 1, startingColumn: 0, columnSpan: 1)
+            configure(cell)
+            blocks[identity] = cell
+            return cell
         }
 
         private mutating func startRow(identity: Int, header: Bool) {

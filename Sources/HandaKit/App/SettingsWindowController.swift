@@ -51,7 +51,7 @@ private enum Form {
         let label = NSTextField(wrappingLabelWithString: text)
         label.font = .systemFont(ofSize: 11)
         label.textColor = .secondaryLabelColor
-        label.preferredMaxLayoutWidth = 560
+        label.preferredMaxLayoutWidth = Form.width - 48
         return label
     }
 
@@ -61,6 +61,8 @@ private enum Form {
         return box
     }
 
+    static let width: CGFloat = 640
+
     static func stack(_ views: [NSView], spacing: CGFloat = 10) -> NSStackView {
         let stack = NSStackView(views: views)
         stack.orientation = .vertical
@@ -68,6 +70,16 @@ private enum Form {
         stack.spacing = spacing
         stack.edgeInsets = NSEdgeInsets(top: 20, left: 24, bottom: 20, right: 24)
         return stack
+    }
+
+    /// Sizes a pane to the fixed width and whatever height its content needs.
+    static func install(_ stack: NSStackView, in controller: NSViewController) {
+        stack.frame = NSRect(x: 0, y: 0, width: width, height: 100)
+        stack.layoutSubtreeIfNeeded()
+        let size = NSSize(width: width, height: ceil(stack.fittingSize.height))
+        stack.frame.size = size
+        controller.preferredContentSize = size
+        controller.view = stack
     }
 
     static func row(_ views: [NSView]) -> NSStackView {
@@ -106,9 +118,7 @@ private final class GeneralSettings: NSViewController {
         views.append(Form.section("Opening files"))
         views.append(Form.checkbox("Open files ready to edit (instead of as a preview)", Preferences.openInEditMode, self, #selector(toggleEditMode(_:))))
         views.append(Form.checkbox("Close previews with the Esc key", Preferences.escClosesPreview, self, #selector(toggleEsc(_:))))
-        let stack = Form.stack(views)
-        stack.frame = NSRect(x: 0, y: 0, width: 640, height: 430)
-        view = stack
+        Form.install(Form.stack(views), in: self)
         refresh()
     }
 
@@ -165,8 +175,7 @@ private final class ViewerSettings: NSViewController {
             Form.checkbox("Show line numbers", Preferences.showLineNumbers, self, #selector(toggleLineNumbers(_:))),
             Form.note("Plain text and Markdown always wrap. Files over 4 MB open without colouring so they stay fast."),
         ])
-        stack.frame = NSRect(x: 0, y: 0, width: 640, height: 220)
-        view = stack
+        Form.install(stack, in: self)
     }
 
     @objc private func sizeChanged(_ sender: NSStepper) {
@@ -221,7 +230,7 @@ private final class AISettings: NSViewController, NSTableViewDataSource, NSTable
         commandField.widthAnchor.constraint(equalToConstant: 360).isActive = true
         commandField.delegate = self
         instructionField = NSTextField(string: Preferences.reviewInstruction)
-        instructionField.widthAnchor.constraint(equalToConstant: 470).isActive = true
+        instructionField.widthAnchor.constraint(equalToConstant: 500).isActive = true
         instructionField.delegate = self
 
         // Automatic review rules
@@ -241,8 +250,8 @@ private final class AISettings: NSViewController, NSTableViewDataSource, NSTable
         scroll.documentView = rulesTable
         scroll.hasVerticalScroller = true
         scroll.borderType = .bezelBorder
-        scroll.heightAnchor.constraint(equalToConstant: 96).isActive = true
-        scroll.widthAnchor.constraint(equalToConstant: 560).isActive = true
+        scroll.heightAnchor.constraint(equalToConstant: 84).isActive = true
+        scroll.widthAnchor.constraint(equalToConstant: Form.width - 48).isActive = true
         let add = NSButton(image: NSImage(systemSymbolName: "plus", accessibilityDescription: "Add rule") ?? NSImage(), target: self, action: #selector(addRule(_:)))
         let remove = NSButton(image: NSImage(systemSymbolName: "minus", accessibilityDescription: "Remove rule") ?? NSImage(), target: self, action: #selector(removeRule(_:)))
         for button in [add, remove] { button.bezelStyle = .smallSquare }
@@ -267,8 +276,7 @@ private final class AISettings: NSViewController, NSTableViewDataSource, NSTable
             Form.section("Automatic reviews"),
             auto, scroll, Form.row([add, remove]),
         ], spacing: 8)
-        stack.frame = NSRect(x: 0, y: 0, width: 640, height: 640)
-        view = stack
+        Form.install(stack, in: self)
         updateEnabled()
     }
 

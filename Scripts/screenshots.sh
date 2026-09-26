@@ -30,6 +30,8 @@ shot() {
   if [ ! -f "$ready" ]; then
     echo "No window for $name"; cat "$WORK/$name.log"; kill "$pid" 2>/dev/null || true; return 1
   fi
+  # Bring the app to the front so the window is drawn as active.
+  osascript -e "tell application \"System Events\" to set frontmost of (first process whose unix id is $pid) to true" >/dev/null 2>&1 || true
   sleep "${WAIT:-2}"
   local window
   window=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["windowNumber"])' "$ready")
@@ -45,7 +47,6 @@ printf '%s\n' \
   "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"add_review\",\"arguments\":{\"path\":\"$PWD/Samples/Sales.csv\",\"title\":\"Sales check\",\"review\":\"**Summary.** 150 sales across three shops from 1 July to 20 August 2026, worth **\$17,134.85** in total. Every *Total* matches *Quantity × Unit Price* and there are no duplicate rows.\\n\\n**Worth a look**\\n\\n1. **Riverside is about \$1,000 behind** the other two shops (\$5,064.65 against roughly \$6,035 each).\\n2. **Rye bread** brings in the most (\$3,014.90), ahead of cinnamon buns (\$2,306.25) and cold brew (\$1,968.00).\\n3. **Cakes are the smallest category** at \$2,155.50. Two lemon tart sales on 27 and 28 July were only 2 units each.\\n\\nNothing looks wrong with the data itself.\"}}}" \
   | "$BIN" mcp >/dev/null 2>&1
 
-shot welcome - HANDA_SHOW=welcome
 shot pdf "Samples/Quarterly Report.pdf" HANDA_SIDEBAR=1
 shot word "Samples/Team Meeting.docx"
 shot csv "Samples/Sales.csv"
@@ -53,7 +54,9 @@ shot markdown "Samples/Opening Checklist.md" HANDA_APPEARANCE=dark
 shot code "Samples/inventory.py" HANDA_APPEARANCE=dark
 shot image "Samples/Harbor.png"
 WAIT=4 shot quicklook "Samples/Budget.xlsx"
-APP_ARGS="-AIEnabled YES" shot ai "Samples/Sales.csv" HANDA_SHOW_REVIEWS=1
-APP_ARGS="-AIEnabled YES" SIZE=640x480 shot settings - HANDA_SHOW=settings-ai
+WAIT=3 APP_ARGS="-AIEnabled YES" shot ai "Samples/Sales.csv" HANDA_SHOW_REVIEWS=1
+APP_ARGS="-AIEnabled YES" shot settings - HANDA_SHOW=settings-ai
+# Last, so Recent Files lists the samples opened above.
+shot welcome - HANDA_SHOW=welcome
 
 ls -la "$OUT"

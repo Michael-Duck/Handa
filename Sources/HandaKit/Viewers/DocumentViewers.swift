@@ -100,7 +100,7 @@ final class RichTextViewer: Viewer, NSTextViewDelegate {
     private let content: RichTextContent
     private var scrollView: NSScrollView!
     private var canvas: FlippedView!
-    private var paper: NSView!
+    private var paper: FlippedView!
     private(set) var textView: ReadingTextView!
     private var layoutManager: NSLayoutManager!
     private var stats: TextStats?
@@ -137,7 +137,7 @@ final class RichTextViewer: Viewer, NSTextViewDelegate {
         scrollView.maxMagnification = 3
 
         canvas = FlippedView(frame: NSRect(x: 0, y: 0, width: pageWidth + 80, height: 900))
-        paper = NSView(frame: NSRect(x: 40, y: 32, width: pageWidth, height: 800))
+        paper = FlippedView(frame: NSRect(x: 40, y: 32, width: pageWidth, height: 800))
         paper.wantsLayer = true
         paper.layer?.backgroundColor = NSColor.white.cgColor
         paper.layer?.cornerRadius = 3

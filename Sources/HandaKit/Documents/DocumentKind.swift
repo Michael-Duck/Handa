@@ -100,10 +100,17 @@ enum ViewMode: String {
     case source
     case quickLook
 
+    /// The first mode is the one a file opens in.
     static func modes(for kind: DocumentKind) -> [ViewMode] {
         switch kind.category {
         case .markdown, .table: return [.standard, .source]
-        case .richText: return [.standard, .quickLook]
+        case .richText:
+            // AppKit's Word importer drops paragraph styles, so Word files preview through Quick Look,
+            // which lays them out like Word does. Editing switches to Handa's own text view.
+            switch kind.richTextFormat {
+            case .rtf?, .rtfd?, nil: return [.standard, .quickLook]
+            default: return [.quickLook, .standard]
+            }
         case .text where kind.hasQuickLookAlternative: return [.standard, .quickLook]
         default: return [.standard]
         }
@@ -115,7 +122,7 @@ enum ViewMode: String {
         case (.markdown, .source): return "Source"
         case (.table, .standard): return "Table"
         case (.table, .source): return "Text"
-        case (.richText, .standard): return "Document"
+        case (.richText, .standard): return "Text"
         case (.richText, .quickLook): return "Original"
         case (.text, .standard): return "Source"
         case (.text, .quickLook): return "Rendered"
