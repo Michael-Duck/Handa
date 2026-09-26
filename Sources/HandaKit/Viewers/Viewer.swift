@@ -30,7 +30,7 @@ class Viewer: NSViewController, NSMenuItemValidation {
     var statusText: String { "" }
 
     /// Finish any in-progress edit (like a table cell being typed in) before saving.
-    func commitEditing() {}
+    func finishEditing() {}
 
     /// The view that should have keyboard focus when the window opens.
     var preferredFirstResponder: NSView? { nil }

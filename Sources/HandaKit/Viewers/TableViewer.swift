@@ -228,7 +228,7 @@ final class TableViewer: Viewer, NSTableViewDataSource, NSTableViewDelegate, NST
         }
     }
 
-    override func commitEditing() {
+    override func finishEditing() {
         if tableView?.currentEditor() != nil { view.window?.makeFirstResponder(tableView) }
     }
 

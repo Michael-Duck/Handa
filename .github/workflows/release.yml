@@ -1,0 +1,31 @@
+name: Release
+
+# Push a tag like v1.0.0 to publish a downloadable Handa.zip.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Build
+        run: Scripts/build.sh --universal
+
+      - name: Smoke test
+        run: Scripts/smoke-test.sh
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ditto -c -k --keepParent build/Handa.app build/Handa.zip
+          gh release create "$GITHUB_REF_NAME" build/Handa.zip --title "Handa ${GITHUB_REF_NAME#v}" --generate-notes

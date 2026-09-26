@@ -17,7 +17,7 @@ for arg in "$@"; do
   esac
 done
 
-VERSION="$(cat VERSION)"
+VERSION="$(cat Resources/VERSION)"
 BUILD="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 APP="build/Handa.app"
 

@@ -129,7 +129,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
 
     func setMode(_ newMode: ViewMode) {
         guard newMode != mode, modes.contains(newMode) else { return }
-        viewer.commitEditing()
+        viewer.finishEditing()
         if newMode == .quickLook, isEditingEnabled { setEditing(false) }
         mode = newMode
         installViewer(DocumentWindowController.makeViewer(for: handaDocument, mode: newMode))
@@ -153,7 +153,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         window?.toolbar?.validateVisibleItems()
     }
 
-    func commitEditing() { viewer.commitEditing() }
+    func finishEditing() { viewer.finishEditing() }
 
     // MARK: Editing
 

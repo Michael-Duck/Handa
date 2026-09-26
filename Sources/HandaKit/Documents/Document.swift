@@ -116,7 +116,7 @@ final class Document: NSDocument {
     var supportsEditing: Bool { isWritable }
 
     override func data(ofType typeName: String) throws -> Data {
-        windowController?.commitEditing()
+        windowController?.finishEditing()
         switch content {
         case .text(let text), .markdown(let text):
             if let data = text.encoded() { return data }
@@ -140,7 +140,7 @@ final class Document: NSDocument {
 
     override func fileWrapper(ofType typeName: String) throws -> FileWrapper {
         if case .richText(let rich) = content, rich.format == .rtfd {
-            windowController?.commitEditing()
+            windowController?.finishEditing()
             return try rich.storage.fileWrapper(from: NSRange(location: 0, length: rich.storage.length),
                                                 documentAttributes: rich.writingAttributes)
         }

@@ -110,7 +110,7 @@ enum MainMenu {
             menu("Text", [
                 item("Align Left", #selector(NSText.alignLeft(_:)), "{"),
                 item("Center", #selector(NSText.alignCenter(_:)), "|"),
-                item("Justify", #selector(NSText.alignJustified(_:))),
+                item("Justify", #selector(NSTextView.alignJustified(_:))),
                 item("Align Right", #selector(NSText.alignRight(_:)), "}"),
                 .separator(),
                 item("Show Ruler", #selector(NSText.toggleRuler(_:))),

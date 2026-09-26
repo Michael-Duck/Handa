@@ -130,6 +130,7 @@ public enum AnthropicClient {
         return send(apiKey: apiKey, model: model, prompt: prompt, useFallbacks: true, session: session, completion: completion)
     }
 
+    @discardableResult
     private static func send(apiKey: String, model: String, prompt: String, useFallbacks: Bool, session: URLSession,
                              completion: @escaping (Result<String, Error>) -> Void) -> URLSessionDataTask {
         let body = requestBody(model: model, system: reviewSystemPrompt, prompt: prompt, useFallbacks: useFallbacks)
