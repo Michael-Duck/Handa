@@ -101,31 +101,11 @@ enum Automation {
         ]
         try? Data(payload.serialized().utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
         FileHandle.standardError.write(Data("HANDA_READY \(payload.serialized())\n".utf8))
-        if environment["HANDA_DUMP_VIEWS"] == "1" {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { dumpViews(of: window) }
-        }
         if let files = environment["HANDA_BENCH_FILES"], !files.isEmpty {
             DispatchQueue.main.async { benchmarkOpens(files.split(separator: ":").map { URL(fileURLWithPath: String($0)) }) }
         } else if let quit = environment["HANDA_QUIT_AFTER"].flatMap({ Double($0) }) {
             // _exit skips exit-time handlers, which can wait on framework threads and hang a benchmark.
             DispatchQueue.main.asyncAfter(deadline: .now() + quit) { _exit(0) }
         }
-    }
-
-    /// Prints every view in the window with its frame in window coordinates, to debug layout on CI machines.
-    private static func dumpViews(of window: NSWindow) {
-        guard let root = window.contentView?.superview ?? window.contentView else { return }
-        var lines: [String] = []
-        func visit(_ view: NSView, depth: Int) {
-            let frame = view.convert(view.bounds, to: nil)
-            var line = String(repeating: "  ", count: depth) + "\(type(of: view)) \(Int(frame.minX)),\(Int(frame.minY)) \(Int(frame.width))x\(Int(frame.height))"
-            if view.isHidden { line += " hidden" }
-            if #available(macOS 14.0, *), !view.clipsToBounds { line += " unclipped" }
-            lines.append(line)
-            guard depth < 14, !(view is NSTableView), !(view is NSTextView) else { return }
-            for subview in view.subviews { visit(subview, depth: depth + 1) }
-        }
-        visit(root, depth: 0)
-        FileHandle.standardError.write(Data(("HANDA_VIEWS\n" + lines.joined(separator: "\n") + "\n").utf8))
     }
 }

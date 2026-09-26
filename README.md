@@ -9,14 +9,14 @@ Handa is a small, fast Mac app for opening files. Double-click a PDF, a Word doc
 
 It's plain Swift on Apple's own frameworks, with no dependencies. The whole app is __SIZE__ and shows a file about __LAUNCH__ after you double-click it.
 
-<p align="center"><img src="docs/screenshots/pdf.png" alt="A PDF open in Handa, with page thumbnails" width="860"></p>
+<p align="center"><img src="docs/screenshots/hero.png" alt="Markdown, a PDF and a CSV table open in Handa" width="900"></p>
 
 ## What it opens
 
 <table>
 <tr>
 <td width="50%"><b>PDF</b><br>Thumbnails, search, highlight, underline, notes. Rotate or delete pages.<br><img src="docs/screenshots/pdf.png" alt="PDF"></td>
-<td width="50%"><b>Word, RTF, OpenDocument</b><br>Shown in their original layout. Press Edit to change the text.<br><img src="docs/screenshots/word.png" alt="Word document"></td>
+<td width="50%"><b>Word, RTF, OpenDocument</b><br>Word files keep their original layout. Press Edit to change the text.<br><img src="docs/screenshots/word.png" alt="Word document"></td>
 </tr>
 <tr>
 <td><b>CSV and TSV</b><br>A real table: sort, filter, edit cells, add rows and columns.<br><img src="docs/screenshots/csv.png" alt="CSV table"></td>
@@ -52,6 +52,7 @@ Prefer a download? Tagged versions come with a `Handa.zip` on the [Releases](htt
 - **⌘]** and **⌘[** step through the other files in the same folder.
 - **⌘1** and **⌘2** switch views, like a CSV's table and its raw text, or Markdown and its source.
 - Nothing changes on disk until you save. Handa keeps each file's encoding, line endings and CSV quoting, and an unedited file follows changes made by other apps.
+- Like Preview, Handa stays open after you close its last window, so the next file opens even faster.
 
 ## AI, if you want it
 

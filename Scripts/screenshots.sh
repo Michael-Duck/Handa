@@ -13,6 +13,30 @@ mkdir -p "$OUT"
 
 system_profiler SPDisplaysDataType 2>/dev/null | grep -E "Resolution|UI Looks like" || true
 
+# Counts screenshots whose middle is one flat colour, which means the window drew nothing there.
+blank=0
+check_drawn() {
+  sips -s format bmp "$1" --out "$WORK/check.bmp" >/dev/null 2>&1 || return 0
+  if ! python3 - "$WORK/check.bmp" <<'PY'
+import collections, struct, sys
+data = open(sys.argv[1], "rb").read()
+offset = struct.unpack_from("<I", data, 10)[0]
+width, height = struct.unpack_from("<ii", data, 18)
+depth = struct.unpack_from("<H", data, 28)[0] // 8
+height, row = abs(height), (width * depth + 3) & ~3
+colours = collections.Counter()
+for y in range(height // 4, height * 3 // 4, 3):
+    start = offset + y * row
+    for x in range(width * 15 // 100, width * 85 // 100, 3):
+        colours[data[start + x * depth:start + x * depth + 3]] += 1
+sys.exit(1 if colours.most_common(1)[0][1] / sum(colours.values()) > 0.995 else 0)
+PY
+  then
+    echo "FAIL: $(basename "$1") looks blank"
+    blank=$((blank + 1))
+  fi
+}
+
 # shot <name> <file or -> [VAR=value …]   (APP_ARGS adds arguments for the app)
 shot() {
   local name="$1" file="$2"
@@ -36,6 +60,7 @@ shot() {
   local window
   window=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["windowNumber"])' "$ready")
   screencapture -x -l "$window" "$OUT/$name.png"
+  check_drawn "$OUT/$name.png"
   kill "$pid" 2>/dev/null || true
   for _ in $(seq 1 50); do ps -p "$pid" >/dev/null 2>&1 || break; sleep 0.1; done
   kill -9 "$pid" 2>/dev/null || true
@@ -56,10 +81,13 @@ shot markdown "Samples/Opening Checklist.md" HANDA_APPEARANCE=dark
 shot code "Samples/inventory.py" HANDA_APPEARANCE=dark
 shot image "Samples/Harbor.png"
 WAIT=4 shot quicklook "Samples/Budget.xlsx"
-WAIT=3 APP_ARGS="-AIEnabled YES" shot ai "Samples/Sales.csv" HANDA_SHOW_REVIEWS=1 HANDA_DUMP_VIEWS=1
-sed -n '/HANDA_VIEWS/,$p' "$WORK/ai.log" | head -200
+WAIT=3 APP_ARGS="-AIEnabled YES" shot ai "Samples/Sales.csv" HANDA_SHOW_REVIEWS=1
 APP_ARGS="-AIEnabled YES" shot settings - HANDA_SHOW=settings-ai
 # Last, so Recent Files lists the samples opened above.
 shot welcome - HANDA_SHOW=welcome
 
 ls -la "$OUT"
+if [ "$blank" -gt 0 ]; then
+  echo "$blank screenshot(s) look blank"
+  exit 1
+fi

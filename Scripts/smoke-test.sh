@@ -208,36 +208,54 @@ if [ "$(asks_to_confirm)" = no ]; then
     fail "make-default"
   fi
 else
-  # macOS 26.4 and later ask the user to confirm each file type, which nobody can do here. Check
-  # Handa asks, and keep a picture of what macOS shows.
-  cat > "$WORK/windows.js" <<'JS'
-ObjC.import("CoreGraphics")
+  # macOS 26.4 and later ask the user to confirm each file type. Answer "Use Handa" the way a
+  # person would, through System Events, and check each question comes up and takes effect.
+  cat > "$WORK/confirm.js" <<'JS'
 function run() {
-  const windows = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(17, 0))) || []
-  const lines = windows.filter(w => w.kCGWindowLayer >= 0 && w.kCGWindowOwnerName !== "Dock")
-    .map(w => `${w.kCGWindowOwnerName} layer ${w.kCGWindowLayer}: "${w.kCGWindowName || ""}" ${Math.round(w.kCGWindowBounds.Width)}x${Math.round(w.kCGWindowBounds.Height)}`)
-  const events = Application("System Events")
-  for (const name of [...new Set(windows.map(w => w.kCGWindowOwnerName))]) {
-    try {
-      for (const window of events.processes.byName(name).windows()) {
-        lines.push(`${name}: "${window.name()}" buttons: ${window.buttons.name().join(", ")}; text: ${window.staticTexts.value().join(" / ")}`)
+  const agent = Application("System Events").processes.byName("CoreServicesUIAgent")
+  try {
+    for (const window of agent.windows()) {
+      const text = window.staticTexts.value().join(" ")
+      for (const button of window.buttons()) {
+        if (button.name().startsWith("Use") && button.name().includes("Handa")) {
+          button.click()
+          return "confirmed: " + text
+        }
       }
-    } catch (error) { lines.push(`${name}: ${error}`) }
-  }
-  return lines.join("\n")
+    }
+  } catch (error) { return "error: " + error }
+  return "waiting"
 }
 JS
+  printf 'plain text\n' > "$WORK/plain.txt"
   "$BIN" make-default >"$WORK/make-default.log" 2>&1 &
   pid=$!
-  sleep 8
-  mkdir -p build/screenshots/debug
-  screencapture -x build/screenshots/debug/make-default.png 2>/dev/null || true
-  osascript -l JavaScript "$WORK/windows.js" 2>&1 | head -40 || true
-  kill "$pid" 2>/dev/null || true
+  confirmed=0
+  for _ in $(seq 1 120); do
+    alive "$pid" || break
+    answer=$(osascript -l JavaScript "$WORK/confirm.js" 2>&1 || true)
+    case "$answer" in
+      confirmed*)
+        confirmed=$((confirmed + 1))
+        if [ "$confirmed" -eq 1 ]; then echo "  macOS asked: ${answer#confirmed: }"; fi
+        ;;
+      error*) echo "  $answer" ;;
+    esac
+    sleep 0.5
+  done
+  if alive "$pid"; then
+    kill "$pid" 2>/dev/null || true
+    fail "make-default was still waiting after $confirmed confirmation(s)"
+  fi
   wait "$pid" 2>/dev/null || true
   cat "$WORK/make-default.log"
-  grep -q "confirm each of the 5 file types" "$WORK/make-default.log" || fail "make-default should say macOS asks to confirm"
-  echo "make-default: asks macOS, which wants the user to confirm each type on this version"
+  [ "$confirmed" -gt 0 ] || fail "macOS never asked to confirm"
+  for f in "Samples/Quarterly Report.pdf" "Samples/Team Meeting.docx" "Samples/Sales.csv" "Samples/Opening Checklist.md" "$WORK/plain.txt"; do
+    case "$f" in /*) path="$f" ;; *) path="$PWD/$f" ;; esac
+    owner=$(osascript -l JavaScript "$WORK/opens-with.js" "$path" 2>&1 || true)
+    [ "$owner" = "io.github.michael-duck.handa" ] || fail "$(basename "$f") opens with $owner, not Handa"
+  done
+  echo "make-default: ok after confirming $confirmed file types"
 fi
 
 { echo "Launch to first window:"; cat "$RESULTS"; echo; echo "Open while running:"; cat "$WORK/warm-open.txt"; } > build/launch-times.txt 2>/dev/null || true

@@ -609,8 +609,9 @@ final class ContainerViewController: NSViewController {
         let content = viewer.view
         content.setContentHuggingPriority(.defaultLow, for: .vertical)
         content.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
-        // Keep the status bar in front, so nothing a viewer draws past its edge can cover it.
-        stack.addSubview(content, positioned: .below, relativeTo: statusBar)
+        // On macOS 26 a scroll view's background reaches past its bottom edge and would cover the
+        // status bar, so keep every viewer inside its own bounds.
+        if #available(macOS 14.0, *) { content.clipsToBounds = true }
         stack.insertArrangedSubview(content, at: 1)
         current = viewer
     }
