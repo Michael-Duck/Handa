@@ -81,6 +81,38 @@ launch "$WORK/notes.txt" text
 launch "$WORK/letter.rtf" richText
 
 echo
+echo "Opening a file while Handa is already running (best of two):"
+samples=""
+for f in "Quarterly Report.pdf" "Team Meeting.docx" "Sales.csv" "Opening Checklist.md" "inventory.py" "recipes.json" "Harbor.png" "Budget.xlsx"; do
+  samples="$samples:$PWD/Samples/$f"
+done
+samples="${samples#:}"
+HANDA_READY_FILE="$WORK/bench-ready.json" HANDA_BENCH_FILES="$samples:$samples" HANDA_BENCH_RESULT="$WORK/bench.json" \
+  "$BIN" "$WORK/notes.txt" -ApplePersistenceIgnoreState YES >"$WORK/app.log" 2>&1 &
+pid=$!
+for _ in $(seq 1 600); do alive "$pid" || break; sleep 0.1; done
+if alive "$pid"; then
+  fail "warm open benchmark didn't finish"
+  diagnose "$pid" "benchmark"
+fi
+wait "$pid" 2>/dev/null || true
+if [ -f "$WORK/bench.json" ]; then
+  python3 - "$WORK/bench.json" <<'PY' | tee "$WORK/warm-open.txt"
+import json, sys
+best = {}
+for entry in json.load(open(sys.argv[1])):
+    key = (entry["file"], entry["kind"])
+    best[key] = min(best.get(key, 1e9), entry["milliseconds"])
+for (name, kind), ms in best.items():
+    print(f"{name:<24} {kind:<10} {ms:6.1f} ms")
+PY
+  grep -q failed "$WORK/warm-open.txt" && fail "a file failed to open in the running app"
+else
+  fail "warm open benchmark wrote no results"
+  cat "$WORK/app.log"
+fi
+
+echo
 echo "Command line:"
 "$BIN" --version
 "$BIN" extract "Samples/Team Meeting.docx" | grep -q "Action items" || fail "extract docx"
@@ -118,4 +150,4 @@ if [ "$failures" -gt 0 ]; then
   exit 1
 fi
 echo "All smoke tests passed."
-cp "$RESULTS" build/launch-times.txt 2>/dev/null || true
+{ echo "Launch to first window:"; cat "$RESULTS"; echo; echo "Open while running:"; cat "$WORK/warm-open.txt"; } > build/launch-times.txt 2>/dev/null || true

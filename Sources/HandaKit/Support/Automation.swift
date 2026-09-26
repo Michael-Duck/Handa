@@ -29,6 +29,30 @@ enum Automation {
         }
     }
 
+    /// Opens each file in the running app and times it until its window has drawn,
+    /// which is what double-clicking a file feels like once Handa is running.
+    private static func benchmarkOpens(_ files: [URL], results: [JSON] = []) {
+        guard let url = files.first, let controller = NSDocumentController.shared as? DocumentController else {
+            let data = Data(JSON.array(results).serialized().utf8)
+            if let output = environment["HANDA_BENCH_RESULT"] {
+                try? data.write(to: URL(fileURLWithPath: output), options: .atomic)
+            } else {
+                FileHandle.standardError.write(data)
+            }
+            _exit(0)
+        }
+        let start = Date()
+        controller.open(url) { document in
+            DispatchQueue.main.async {
+                document?.windowController?.window?.displayIfNeeded()
+                let ms = (Date().timeIntervalSince(start) * 10_000).rounded() / 10
+                let entry: JSON = ["file": .string(url.lastPathComponent), "kind": .string(document?.kind.category.rawValue ?? "failed"), "milliseconds": .number(ms)]
+                document?.close()
+                benchmarkOpens(Array(files.dropFirst()), results: results + [entry])
+            }
+        }
+    }
+
     /// When the process started, according to the kernel. Includes dyld and runtime set-up.
     static let processStart: Date? = {
         var info = kinfo_proc()
@@ -77,7 +101,9 @@ enum Automation {
         ]
         try? Data(payload.serialized().utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
         FileHandle.standardError.write(Data("HANDA_READY \(payload.serialized())\n".utf8))
-        if let quit = environment["HANDA_QUIT_AFTER"].flatMap({ Double($0) }) {
+        if let files = environment["HANDA_BENCH_FILES"], !files.isEmpty {
+            DispatchQueue.main.async { benchmarkOpens(files.split(separator: ":").map { URL(fileURLWithPath: String($0)) }) }
+        } else if let quit = environment["HANDA_QUIT_AFTER"].flatMap({ Double($0) }) {
             // _exit skips exit-time handlers, which can wait on framework threads and hang a benchmark.
             DispatchQueue.main.asyncAfter(deadline: .now() + quit) { _exit(0) }
         }

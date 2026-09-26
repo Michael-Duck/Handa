@@ -179,6 +179,10 @@ final class HandaKitTests: XCTestCase {
         let codeLocation = (text as NSString).range(of: "./till open").location
         let codeFont = rendered.attribute(.font, at: codeLocation, effectiveRange: nil) as? NSFont
         XCTAssertTrue(codeFont?.isFixedPitch ?? false, "code blocks are monospaced")
+        XCTAssertNotNil(rendered.attribute(MarkdownRenderer.codeBlockKey, at: codeLocation, effectiveRange: nil), "code blocks get a drawn box")
+        let quoteLocation = (text as NSString).range(of: "If an oven shows error").location
+        XCTAssertNotNil(rendered.attribute(MarkdownRenderer.quoteKey, at: quoteLocation, effectiveRange: nil), "quotes get a bar")
+        XCTAssertNotNil(rendered.attribute(MarkdownRenderer.ruleKey, at: 0, effectiveRange: nil), "big headings get a rule")
 
         var sawTableCell = false, sawLink = false
         rendered.enumerateAttributes(in: NSRange(location: 0, length: rendered.length)) { attributes, _, _ in
@@ -263,6 +267,31 @@ final class HandaKitTests: XCTestCase {
         XCTAssertTrue(document.windowController?.viewer is RichTextViewer)
         document.windowController?.window?.close()
         document.close()
+    }
+
+    /// Lays out and draws rendered Markdown in a real window. Text layout bugs only show up here.
+    func testMarkdownLaysOutAndDraws() throws {
+        let document = try open(sample("Opening Checklist.md"))
+        document.makeWindowControllers()
+        let controller = try XCTUnwrap(document.windowController)
+        let window = try XCTUnwrap(controller.window)
+        window.setContentSize(NSSize(width: 900, height: 700))
+        window.orderFront(nil)
+        window.displayIfNeeded()
+        let textView = try XCTUnwrap(findTextView(in: controller.viewer.view))
+        let layoutManager = try XCTUnwrap(textView.layoutManager)
+        layoutManager.ensureLayout(for: try XCTUnwrap(textView.textContainer))
+        let title = layoutManager.boundingRect(forGlyphRange: NSRange(location: 0, length: 17), in: textView.textContainer!)
+        XCTAssertGreaterThan(title.width, 150, "the title is laid out on one line")
+        XCTAssertLessThan(title.height, 60)
+        window.close()
+        document.close()
+    }
+
+    private func findTextView(in view: NSView) -> NSTextView? {
+        if let textView = view as? NSTextView { return textView }
+        for subview in view.subviews { if let found = findTextView(in: subview) { return found } }
+        return nil
     }
 
     func testTableViewerFilterAndStatus() throws {

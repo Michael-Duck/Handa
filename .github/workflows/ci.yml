@@ -28,6 +28,7 @@ jobs:
           swift --version
 
       - name: Unit tests
+        timeout-minutes: 15
         run: swift test
 
       - name: Build Handa.app (Apple silicon + Intel)
@@ -41,10 +42,12 @@ jobs:
           du -sh build/Handa.app
 
       - name: Smoke test the real app
+        timeout-minutes: 10
         run: Scripts/smoke-test.sh
 
       - name: Screenshots
         if: matrix.os == 'macos-26'
+        timeout-minutes: 10
         run: Scripts/screenshots.sh
 
       - name: Package

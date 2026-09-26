@@ -11,6 +11,12 @@ enum MarkdownRenderer {
     }
 
     static let codeBackground = Theme.dynamic(light: Theme.hex(0xF5F2EF), dark: Theme.hex(0x2A2730))
+
+    /// Marks text that `MarkdownTextView` decorates: code block backgrounds, quote bars and heading rules.
+    /// Drawing these by hand avoids NSTextBlock, whose layout is fragile (it hung on macOS 26).
+    static let codeBlockKey = NSAttributedString.Key("HandaCodeBlock")
+    static let quoteKey = NSAttributedString.Key("HandaQuote")
+    static let ruleKey = NSAttributedString.Key("HandaRule")
     static let quoteBar = Theme.dynamic(light: Theme.hex(0xE7DDD6), dark: Theme.hex(0x4A4350))
     static let headerBackground = Theme.dynamic(light: Theme.hex(0xF7F4F1), dark: Theme.hex(0x2A2730))
 
@@ -68,7 +74,6 @@ enum MarkdownRenderer {
         var lastParagraph = NSParagraphStyle()
         var lastAttributes: [NSAttributedString.Key: Any] = [:]
         var seenItems = Set<Int>()
-        var blocks: [Int: NSTextBlock] = [:]
         var tables: [Int: TableState] = [:]
         var activeTable: TableState?
         var endsWithNewline = true
@@ -121,6 +126,10 @@ enum MarkdownRenderer {
             var color = NSColor.labelColor
             var isCode = false
             var codeLanguage: Language?
+            var codeBlock: Int?
+            var quote: Int?
+            var quoteDepth = 0
+            var rule = false
 
             if blockID != lastBlock {
                 endParagraph()
@@ -152,12 +161,8 @@ enum MarkdownRenderer {
             for component in ordered {
                 switch component.kind {
                 case .blockQuote:
-                    textBlocks.append(block(component.identity) { block in
-                        block.setWidth(3, type: .absoluteValueType, for: .border, edge: .minX)
-                        block.setBorderColor(MarkdownRenderer.quoteBar, for: .minX)
-                        block.setWidth(14, type: .absoluteValueType, for: .padding, edge: .minX)
-                        block.setWidth(4, type: .absoluteValueType, for: .margin, edge: .maxY)
-                    })
+                    quoteDepth += 1
+                    quote = component.identity
                     color = .secondaryLabelColor
                 case .orderedList, .unorderedList:
                     listDepth += 1
@@ -167,16 +172,10 @@ enum MarkdownRenderer {
                 case .codeBlock(let hint):
                     isCode = true
                     codeLanguage = hint.flatMap(Language.detect(hint:))
+                    codeBlock = component.identity
                     font = Theme.monospaced(style.codeSize)
-                    paragraph.lineHeightMultiple = 1.12
+                    paragraph.lineHeightMultiple = 1.15
                     paragraph.paragraphSpacing = 0
-                    textBlocks.append(block(component.identity) { block in
-                        block.backgroundColor = MarkdownRenderer.codeBackground
-                        block.setWidth(12, type: .absoluteValueType, for: .padding)
-                        block.setWidth(16, type: .absoluteValueType, for: .padding, edge: .minX)
-                        block.setWidth(12, type: .absoluteValueType, for: .margin, edge: .maxY)
-                        block.setWidth(2, type: .absoluteValueType, for: .margin, edge: .minY)
-                    })
                 case .header(let level):
                     let sizes: [CGFloat] = [30, 23, 19, 16.5, 15, 14]
                     font = NSFont.systemFont(ofSize: sizes[min(max(level, 1), 6) - 1], weight: level <= 2 ? .bold : .semibold)
@@ -185,12 +184,8 @@ enum MarkdownRenderer {
                     paragraph.lineHeightMultiple = 1.1
                     if level >= 6 { color = .secondaryLabelColor }
                     if level <= 2 {
-                        textBlocks.append(block(component.identity) { block in
-                            block.setWidth(1, type: .absoluteValueType, for: .border, edge: .maxY)
-                            block.setBorderColor(.separatorColor, for: .maxY)
-                            block.setWidth(6, type: .absoluteValueType, for: .padding, edge: .maxY)
-                            block.setWidth(12, type: .absoluteValueType, for: .margin, edge: .maxY)
-                        })
+                        rule = true
+                        paragraph.paragraphSpacing = 18
                     }
                 case .table, .tableHeaderRow, .tableRow:
                     break
@@ -217,9 +212,15 @@ enum MarkdownRenderer {
                 }
             }
 
+            // Quotes and code blocks are indented; MarkdownTextView draws the bar or box in the margin.
+            let baseIndent = CGFloat(quoteDepth) * 18 + (codeBlock != nil ? 16 : 0)
+            paragraph.headIndent = baseIndent
+            paragraph.firstLineHeadIndent = baseIndent
+            if codeBlock != nil { paragraph.tailIndent = -16 }
+
             if listDepth > 0 {
                 let hang: CGFloat = 20
-                let head = CGFloat(listDepth) * 22 + 2
+                let head = baseIndent + CGFloat(listDepth) * 22 + 2
                 paragraph.headIndent = head
                 paragraph.firstLineHeadIndent = head
                 paragraph.tabStops = [NSTextTab(textAlignment: .left, location: head)]
@@ -246,6 +247,9 @@ enum MarkdownRenderer {
 
             // Inline styling
             var attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color, .paragraphStyle: paragraph]
+            if let codeBlock = codeBlock { attributes[MarkdownRenderer.codeBlockKey] = codeBlock }
+            if let quote = quote { attributes[MarkdownRenderer.quoteKey] = quote }
+            if rule { attributes[MarkdownRenderer.ruleKey] = true }
             if !isCode {
                 let bold = inline.contains(.stronglyEmphasized)
                 let italic = inline.contains(.emphasized)
@@ -284,6 +288,7 @@ enum MarkdownRenderer {
                 write("\u{FFFC}", imageAttributes)
             } else {
                 let start = output.length
+                let startsBlock = blockID != lastBlock
                 write(text, attributes)
                 if isCode, let language = codeLanguage {
                     for token in SyntaxHighlighter.tokens(in: text, language: language) {
@@ -291,6 +296,7 @@ enum MarkdownRenderer {
                                             range: NSRange(location: start + token.range.location, length: token.range.length))
                     }
                 }
+                if isCode { padCodeBlock(start: start, length: output.length - start, startsBlock: startsBlock, base: paragraph) }
             }
 
             lastBlock = blockID
@@ -301,18 +307,21 @@ enum MarkdownRenderer {
             lastAttributes.removeValue(forKey: .backgroundColor)
         }
 
-        /// Quotes, code blocks and headings sit in a one-cell table. A bare NSTextBlock shrinks to its
-        /// narrowest width; a table cell at 100% spans the column and keeps its padding inside.
-        private mutating func block(_ identity: Int, configure: (NSTextBlock) -> Void) -> NSTextBlock {
-            if let existing = blocks[identity] { return existing }
-            let table = NSTextTable()
-            table.numberOfColumns = 1
-            table.layoutAlgorithm = .automaticLayoutAlgorithm
-            table.setContentWidth(100, type: .percentageValueType)
-            let cell = NSTextTableBlock(table: table, startingRow: 0, rowSpan: 1, startingColumn: 0, columnSpan: 1)
-            configure(cell)
-            blocks[identity] = cell
-            return cell
+        /// Leaves room above the first line and below the last so the drawn box has padding.
+        private func padCodeBlock(start: Int, length: Int, startsBlock: Bool, base: NSParagraphStyle) {
+            guard length > 0 else { return }
+            let text = output.mutableString
+            if startsBlock {
+                let first = text.paragraphRange(for: NSRange(location: start, length: 0))
+                let style = base.mutableCopy() as! NSMutableParagraphStyle
+                style.paragraphSpacingBefore = 12
+                output.addAttribute(.paragraphStyle, value: style, range: first)
+            }
+            let lastLocation = max(start, start + length - 1)
+            let last = text.paragraphRange(for: NSRange(location: lastLocation, length: 0))
+            let style = ((output.attribute(.paragraphStyle, at: last.location, effectiveRange: nil) as? NSParagraphStyle) ?? base).mutableCopy() as! NSMutableParagraphStyle
+            style.paragraphSpacing = 22
+            output.addAttribute(.paragraphStyle, value: style, range: last)
         }
 
         private mutating func startRow(identity: Int, header: Bool) {

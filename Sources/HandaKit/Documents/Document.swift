@@ -225,6 +225,36 @@ final class DocumentController: NSDocumentController {
         (try? url.resourceValues(forKeys: [.contentTypeKey]))?.contentType?.identifier ?? UTType.data.identifier
     }
 
+    /// Small files are read right here on the main thread: it takes a millisecond or two and skips
+    /// two thread hops. Bigger files take AppKit's usual path and are read in the background.
+    static let synchronousOpenLimit = 512 * 1024
+
+    override func openDocument(withContentsOf url: URL, display displayDocument: Bool,
+                               completionHandler: @escaping (NSDocument?, Bool, Error?) -> Void) {
+        if let existing = document(for: url) {
+            if displayDocument { existing.showWindows() }
+            completionHandler(existing, true, nil)
+            return
+        }
+        let values = try? url.resourceValues(forKeys: [.fileSizeKey, .isDirectoryKey])
+        guard values?.isDirectory != true, let size = values?.fileSize, size < DocumentController.synchronousOpenLimit else {
+            super.openDocument(withContentsOf: url, display: displayDocument, completionHandler: completionHandler)
+            return
+        }
+        do {
+            let document = try makeDocument(withContentsOf: url, ofType: try typeForContents(of: url))
+            addDocument(document)
+            noteNewRecentDocument(document)
+            if displayDocument {
+                document.makeWindowControllers()
+                document.showWindows()
+            }
+            completionHandler(document, false, nil)
+        } catch {
+            completionHandler(nil, false, error)
+        }
+    }
+
     /// Any file can be opened, so the panel doesn't filter by type.
     override func openDocument(_ sender: Any?) {
         let panel = NSOpenPanel()

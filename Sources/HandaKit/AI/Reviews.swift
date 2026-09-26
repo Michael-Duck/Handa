@@ -177,7 +177,7 @@ final class ReviewPanelController: NSViewController {
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
         scroll.drawsBackground = false
-        textView = NSTextView(frame: NSRect(origin: .zero, size: scroll.contentSize))
+        textView = MarkdownTextView(frame: NSRect(origin: .zero, size: scroll.contentSize))
         textView.isEditable = false
         textView.isSelectable = true
         textView.drawsBackground = false
@@ -186,6 +186,7 @@ final class ReviewPanelController: NSViewController {
         textView.isVerticallyResizable = true
         textView.textContainer?.widthTracksTextView = true
         textView.linkTextAttributes = [.foregroundColor: Theme.accent, .cursor: NSCursor.pointingHand]
+        textView.layoutManager?.allowsNonContiguousLayout = true
         scroll.documentView = textView
 
         let stack = NSStackView(views: [header, status, scroll])

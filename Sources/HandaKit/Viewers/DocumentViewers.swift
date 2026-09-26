@@ -1,8 +1,52 @@
 import AppKit
 import HandaCore
 
+/// Draws what MarkdownRenderer marks up: rounded boxes behind code blocks, bars beside quotes
+/// and rules under the biggest headings.
+class MarkdownTextView: NSTextView {
+    override func drawBackground(in rect: NSRect) {
+        super.drawBackground(in: rect)
+        guard let layoutManager = layoutManager, let container = textContainer,
+              let storage = textStorage, storage.length > 0 else { return }
+        let origin = textContainerOrigin
+        let glyphs = layoutManager.glyphRange(forBoundingRect: rect.offsetBy(dx: -origin.x, dy: -origin.y), in: container)
+        let visible = layoutManager.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
+        guard visible.length > 0 else { return }
+        let right = origin.x + container.size.width - container.lineFragmentPadding
+
+        func decorate(_ key: NSAttributedString.Key, _ draw: (NSRect, CGFloat) -> Void) {
+            var done = Set<Int>()
+            storage.enumerateAttribute(key, in: visible) { value, range, _ in
+                guard value != nil else { return }
+                var block = NSRange(location: 0, length: 0)
+                _ = storage.attribute(key, at: range.location, longestEffectiveRange: &block,
+                                      in: NSRange(location: 0, length: storage.length))
+                guard done.insert(block.location).inserted else { return }
+                let blockGlyphs = layoutManager.glyphRange(forCharacterRange: block, actualCharacterRange: nil)
+                let bounds = layoutManager.boundingRect(forGlyphRange: blockGlyphs, in: container).offsetBy(dx: origin.x, dy: origin.y)
+                let indent = (storage.attribute(.paragraphStyle, at: block.location, effectiveRange: nil) as? NSParagraphStyle)?.headIndent ?? 0
+                draw(bounds, origin.x + container.lineFragmentPadding + indent)
+            }
+        }
+
+        decorate(MarkdownRenderer.codeBlockKey) { bounds, left in
+            let box = NSRect(x: left - 12, y: bounds.minY - 8, width: right - left + 12, height: bounds.height + 14)
+            MarkdownRenderer.codeBackground.setFill()
+            NSBezierPath(roundedRect: box, xRadius: 8, yRadius: 8).fill()
+        }
+        decorate(MarkdownRenderer.quoteKey) { bounds, left in
+            MarkdownRenderer.quoteBar.setFill()
+            NSBezierPath(roundedRect: NSRect(x: left - 14, y: bounds.minY + 1, width: 3, height: bounds.height - 2), xRadius: 1.5, yRadius: 1.5).fill()
+        }
+        decorate(MarkdownRenderer.ruleKey) { bounds, left in
+            NSColor.separatorColor.setFill()
+            NSRect(x: left, y: bounds.maxY + 7, width: right - left, height: 1).fill()
+        }
+    }
+}
+
 /// A read-only text view that keeps its text in a comfortable centred column.
-final class ReadingTextView: NSTextView {
+final class ReadingTextView: MarkdownTextView {
     var maxColumnWidth: CGFloat = 780
     var minimumInset: CGFloat = 32
 
