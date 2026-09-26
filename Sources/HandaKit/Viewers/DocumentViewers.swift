@@ -45,19 +45,16 @@ class MarkdownTextView: NSTextView {
     }
 }
 
-/// A read-only text view that keeps its text in a comfortable centred column.
+/// A text view that can keep its text in a comfortable centred column.
 final class ReadingTextView: MarkdownTextView {
-    var maxColumnWidth: CGFloat = 780
-    var minimumInset: CGFloat = 32
-
-    override func setFrameSize(_ newSize: NSSize) {
-        super.setFrameSize(newSize)
-        let horizontal = max(minimumInset, (newSize.width - maxColumnWidth) / 2)
+    /// Centres a column of at most `maxWidth` in `width`. Pass the scroll view's width, never the
+    /// text view's own: that one changes as scroll bars come and go, and resizing from it loops forever.
+    func fitColumn(to width: CGFloat, maxWidth: CGFloat = 780, minimumInset: CGFloat = 32) {
+        let horizontal = max(minimumInset, ((width - maxWidth) / 2).rounded())
         if abs(textContainerInset.width - horizontal) > 0.5 {
             textContainerInset = NSSize(width: horizontal, height: 28)
         }
     }
-
 }
 
 /// Rendered Markdown. Editing switches the window to the source view.
@@ -99,7 +96,13 @@ final class MarkdownViewer: Viewer {
         textView.layoutManager?.allowsNonContiguousLayout = true
         scrollView.documentView = textView
         view = scrollView
+        textView.fitColumn(to: scrollView.frame.width)
         render()
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        textView.fitColumn(to: scrollView.frame.width)
     }
 
     private var scale: CGFloat = 1
@@ -201,8 +204,6 @@ final class RichTextViewer: Viewer, NSTextViewDelegate {
         layoutManager.addTextContainer(container)
 
         textView = ReadingTextView(frame: NSRect(x: margins.left, y: margins.top, width: textWidth, height: 600), textContainer: container)
-        textView.maxColumnWidth = .greatestFiniteMagnitude
-        textView.minimumInset = 0
         textView.textContainerInset = .zero
         textView.delegate = self
         textView.isEditable = false
