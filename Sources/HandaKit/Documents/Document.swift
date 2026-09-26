@@ -44,6 +44,8 @@ final class Document: NSDocument {
     // MARK: Reading
 
     override func read(from url: URL, ofType typeName: String) throws {
+        Automation.mark("readStart")
+        defer { Automation.mark("readEnd") }
         var kind = DocumentKind.detect(url: url)
         var readOnly: String?
         let ext = url.pathExtension.lowercased()

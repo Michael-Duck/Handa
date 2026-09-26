@@ -39,6 +39,24 @@ enum Automation {
         return Date(timeIntervalSince1970: Double(start.tv_sec) + Double(start.tv_usec) / 1_000_000)
     }()
 
+    private static var phases: [(String, Double)] = []
+    private static let phaseLock = NSLock()
+
+    /// Records how long after launch a step happened. Only active while measuring.
+    static func mark(_ name: String) {
+        guard readyFile != nil else { return }
+        let ms = millisecondsSinceLaunch
+        phaseLock.lock()
+        phases.append((name, (ms * 10).rounded() / 10))
+        phaseLock.unlock()
+    }
+
+    private static func recordedPhases() -> [(String, Double)] {
+        phaseLock.lock()
+        defer { phaseLock.unlock() }
+        return phases
+    }
+
     static var millisecondsSinceLaunch: Double {
         guard let start = processStart else { return -1 }
         return Date().timeIntervalSince(start) * 1000
@@ -55,6 +73,7 @@ enum Automation {
             "kind": .string(kind),
             "file": file.map(JSON.string) ?? .null,
             "frame": [.number(window.frame.origin.x), .number(window.frame.origin.y), .number(window.frame.width), .number(window.frame.height)],
+            "phases": .object(Dictionary(recordedPhases().map { ($0.0, JSON.number($0.1)) }, uniquingKeysWith: { first, _ in first })),
         ]
         try? Data(payload.serialized().utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
         FileHandle.standardError.write(Data("HANDA_READY \(payload.serialized())\n".utf8))

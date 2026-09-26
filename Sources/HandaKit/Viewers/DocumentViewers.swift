@@ -209,6 +209,7 @@ final class RichTextViewer: Viewer, NSTextViewDelegate {
     }
 
     override func tearDown() {
+        guard isViewLoaded, layoutManager.textStorage != nil else { return }
         NotificationCenter.default.removeObserver(self)
         content.storage.removeLayoutManager(layoutManager)
     }

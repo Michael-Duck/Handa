@@ -64,7 +64,7 @@ enum MarkdownRenderer {
         let style: Style
         let baseURL: URL?
         let output = NSMutableAttributedString()
-        var lastBlock: Int?
+        var lastBlock: [Int]?
         var lastParagraph = NSParagraphStyle()
         var lastAttributes: [NSAttributedString.Key: Any] = [:]
         var seenItems = Set<Int>()
@@ -103,7 +103,7 @@ enum MarkdownRenderer {
                              link: URL?, imageURL: URL?) {
             // Outermost first: parents are created before their children, so they have smaller identities.
             let ordered = components.sorted { $0.identity < $1.identity }
-            let blockID = ordered.last?.identity ?? -1
+            let blockID = ordered.map(\.identity)
             var text = rawText
             if inline.contains(.softBreak) { text = " " }
             if inline.contains(.lineBreak) { text = "\u{2028}" }
@@ -129,6 +129,22 @@ enum MarkdownRenderer {
             paragraph.lineHeightMultiple = 1.22
             paragraph.paragraphSpacing = 11
             var textBlocks: [NSTextBlock] = []
+
+            // Tables first, whatever order the parser numbered them in: table, then row, then cell.
+            for component in ordered {
+                if case .table(let columns) = component.kind {
+                    let state = tables[component.identity] ?? TableState(columns: columns)
+                    tables[component.identity] = state
+                    activeTable = state
+                }
+            }
+            for component in ordered {
+                switch component.kind {
+                case .tableHeaderRow: startRow(identity: component.identity, header: true)
+                case .tableRow: startRow(identity: component.identity, header: false)
+                default: break
+                }
+            }
             var listDepth = 0
             var listItem: Component?
             var listKind: PresentationIntent.Kind?
@@ -176,14 +192,8 @@ enum MarkdownRenderer {
                             block.setWidth(12, type: .absoluteValueType, for: .margin, edge: .maxY)
                         })
                     }
-                case .table(let columns):
-                    let state = tables[component.identity] ?? TableState(columns: columns)
-                    tables[component.identity] = state
-                    activeTable = state
-                case .tableHeaderRow:
-                    startRow(identity: component.identity, header: true)
-                case .tableRow:
-                    startRow(identity: component.identity, header: false)
+                case .table, .tableHeaderRow, .tableRow:
+                    break
                 case .tableCell(let column):
                     if let table = activeTable {
                         if blockID != lastBlock {

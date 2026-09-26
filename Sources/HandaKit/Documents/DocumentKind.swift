@@ -47,7 +47,8 @@ struct DocumentKind: Equatable {
             if type.conforms(to: .commaSeparatedText) || type.conforms(to: .tabSeparatedText) {
                 return DocumentKind(category: .table, displayName: typeName ?? "Table")
             }
-            let quickLookTypes: [UTType] = [.audiovisualContent, .threeDContent, .font, .presentation, .spreadsheet, .package, .archive, .application]
+            // Archives are left out on purpose: Quick Look only shows an icon for them, the byte view shows more.
+            let quickLookTypes: [UTType] = [.audiovisualContent, .threeDContent, .font, .presentation, .spreadsheet, .package, .application]
             if quickLookTypes.contains(where: { type.conforms(to: $0) }) || type.identifier.hasPrefix("com.apple.iwork") {
                 return DocumentKind(category: .quickLook, displayName: typeName ?? "Document")
             }

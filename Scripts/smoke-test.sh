@@ -40,6 +40,7 @@ launch() {
   if ! wait "$pid"; then fail "$(basename "$file"): app exited with an error"; cat "$WORK/app.log"; fi
   if [ "$kind" != "$expect" ]; then fail "$(basename "$file"): opened as $kind, expected $expect"; fi
   printf '%-24s %-10s %6s ms\n' "$(basename "$file")" "$kind" "$ms" | tee -a "$RESULTS"
+  python3 -c 'import json,sys; p=json.load(open(sys.argv[1])).get("phases",{}); print("    " + "  ".join(f"{k} {v:g}" for k,v in sorted(p.items(), key=lambda x: x[1])))' "$ready"
 }
 
 echo "Launch to first window:"

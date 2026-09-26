@@ -84,9 +84,15 @@ final class TextViewer: Viewer, NSTextViewDelegate {
         scheduleStats()
     }
 
+    private var isTornDown = false
+
     override func tearDown() {
+        guard !isTornDown, isViewLoaded else { return }
+        isTornDown = true
+        highlightGeneration += 1
         pendingHighlight?.cancel()
         statsWork?.cancel()
+        ruler?.detach()
         content.storage.removeLayoutManager(layoutManager)
     }
 
@@ -155,7 +161,7 @@ final class TextViewer: Viewer, NSTextViewDelegate {
         let work = DispatchWorkItem { [weak self] in
             let tokens = SyntaxHighlighter.tokens(in: text, language: language)
             DispatchQueue.main.async {
-                guard let self = self, generation == self.highlightGeneration else { return }
+                guard let self = self, !self.isTornDown, generation == self.highlightGeneration else { return }
                 self.apply(tokens)
             }
         }
@@ -164,6 +170,7 @@ final class TextViewer: Viewer, NSTextViewDelegate {
     }
 
     private func apply(_ tokens: [Token]) {
+        guard layoutManager.textStorage === content.storage else { return }
         let length = content.storage.length
         layoutManager.removeTemporaryAttribute(.foregroundColor, forCharacterRange: NSRange(location: 0, length: length))
         var colors: [TokenKind: NSColor] = [:]

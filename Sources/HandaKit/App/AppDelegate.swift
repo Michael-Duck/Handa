@@ -8,13 +8,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var preferenceObserver: NSObjectProtocol?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
+        Automation.mark("willFinishLaunching")
         Preferences.register()
         Automation.applyAppearance()
         NSApp.mainMenu = MainMenu.build(appDelegate: self)
         NSWindow.allowsAutomaticWindowTabbing = true
+        Automation.mark("menuBuilt")
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Automation.mark("didFinishLaunching")
         escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             guard event.keyCode == 53,
                   event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.function).isEmpty,

@@ -15,6 +15,7 @@ public enum HandaApp {
     """
 
     public static func main() {
+        Automation.mark("main")
         let arguments = Array(CommandLine.arguments.dropFirst())
         switch arguments.first {
         case "mcp":

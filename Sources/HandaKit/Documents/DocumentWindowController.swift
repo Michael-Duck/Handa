@@ -34,6 +34,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     private var modes: [ViewMode] { ViewMode.modes(for: kind) }
 
     init(document: Document) {
+        Automation.mark("windowControllerStart")
         handaDocument = document
         let modes = ViewMode.modes(for: document.kind)
         mode = Automation.initialMode.flatMap { modes.contains($0) ? $0 : nil } ?? .standard
@@ -76,6 +77,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         }
         if Automation.showReviews { toggleReviews(nil) }
         if Automation.showSidebar, viewer.supportsSidebar { viewer.toggleSidebar() }
+        Automation.mark("windowControllerEnd")
     }
 
     @available(*, unavailable)
@@ -264,6 +266,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
 
     override func showWindow(_ sender: Any?) {
         let firstShow = !(window?.isVisible ?? false)
+        Automation.mark("showWindow")
         super.showWindow(sender)
         guard firstShow, let window = window else { return }
         if let responder = viewer.preferredFirstResponder { window.makeFirstResponder(responder) }
