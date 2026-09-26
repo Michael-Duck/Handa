@@ -1,5 +1,6 @@
 import AppKit
 import Security
+import ServiceManagement
 import UniformTypeIdentifiers
 import HandaCore
 
@@ -105,6 +106,29 @@ enum DefaultApps {
             }
         }
         next()
+    }
+}
+
+/// Starting Handa at login, without a window, so the first file of the day opens as fast as the rest.
+enum KeepReady {
+    static var isOn: Bool { SMAppService.mainApp.status == .enabled }
+
+    /// macOS can hold the login item until it's allowed in System Settings → General → Login Items.
+    static var needsApproval: Bool { SMAppService.mainApp.status == .requiresApproval }
+
+    static func set(_ on: Bool) throws {
+        if on {
+            try SMAppService.mainApp.register()
+        } else {
+            try SMAppService.mainApp.unregister()
+        }
+    }
+
+    /// True while Handa handles the launch macOS started at login.
+    static var isLoginLaunch: Bool {
+        guard let event = NSAppleEventManager.shared().currentAppleEvent,
+              event.eventID == AEEventID(kAEOpenApplication) else { return false }
+        return event.paramDescriptor(forKeyword: AEKeyword(keyAEPropData))?.enumCodeValue == OSType(keyAELaunchedAsLogInItem)
     }
 }
 

@@ -394,6 +394,9 @@ final class HandaKitTests: XCTestCase {
             XCTAssertFalse(category.types.isEmpty, category.title)
             XCTAssertFalse(category.extensions.isEmpty, category.title)
         }
+        // Tests aren't a login launch, and asking about the login item mustn't throw or hang.
+        XCTAssertFalse(KeepReady.isLoginLaunch)
+        _ = KeepReady.isOn
     }
 
     // MARK: MCP

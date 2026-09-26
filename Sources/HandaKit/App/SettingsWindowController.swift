@@ -1,5 +1,6 @@
 import AppKit
 import HandaCore
+import ServiceManagement
 
 /// Settings: General (default apps), Viewer, and AI (MCP, reviews, automatic reviews).
 final class SettingsWindowController: NSWindowController {
@@ -118,6 +119,7 @@ private final class GeneralSettings: NSViewController {
     private var checks: [NSButton] = []
     private var status: [NSTextField] = []
     private var result: NSTextField!
+    private var keepReadyNote: NSTextField!
 
     override func loadView() {
         let intro = "Choose which files open in Handa when you double-click them in Finder."
@@ -149,6 +151,10 @@ private final class GeneralSettings: NSViewController {
         views.append(Form.section("Opening files"))
         views.append(Form.checkbox("Open files ready to edit (instead of as a preview)", Preferences.openInEditMode, self, #selector(toggleEditMode(_:))))
         views.append(Form.checkbox("Close previews with the Esc key", Preferences.escClosesPreview, self, #selector(toggleEsc(_:))))
+        views.append(Form.checkbox("Keep Handa ready in the background, so files open instantly", KeepReady.isOn || KeepReady.needsApproval,
+                                   self, #selector(toggleKeepReady(_:))))
+        keepReadyNote = Form.note(KeepReady.needsApproval ? GeneralSettings.approvalNote : GeneralSettings.keepReadyNote)
+        views.append(keepReadyNote)
         Form.install(Form.stack(views), in: self)
         refresh()
     }
@@ -181,6 +187,20 @@ private final class GeneralSettings: NSViewController {
             Preferences.offeredDefaultApp = true
             self?.refresh()
         }
+    }
+
+    private static let keepReadyNote = "Handa starts without a window when you log in, and stays out of the way until you open a file."
+    private static let approvalNote = "Almost there: allow Handa in System Settings → General → Login Items."
+
+    @objc private func toggleKeepReady(_ sender: NSButton) {
+        do {
+            try KeepReady.set(sender.state == .on)
+            keepReadyNote.stringValue = KeepReady.needsApproval ? GeneralSettings.approvalNote : GeneralSettings.keepReadyNote
+            if KeepReady.needsApproval { SMAppService.openSystemSettingsLoginItems() }
+        } catch {
+            keepReadyNote.stringValue = "macOS didn't allow that: \(error.localizedDescription)"
+        }
+        sender.state = KeepReady.isOn || KeepReady.needsApproval ? .on : .off
     }
 
     @objc private func toggleEditMode(_ sender: NSButton) { Preferences.openInEditMode = sender.state == .on }

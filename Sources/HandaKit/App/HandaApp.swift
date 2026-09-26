@@ -40,7 +40,8 @@ public enum HandaApp {
         app.delegate = delegate
         // The first document controller created becomes the shared one.
         _ = DocumentController()
-        _ = app.setActivationPolicy(.regular)
+        // Inside Handa.app this is already true, and asking again costs launch time. `swift run` needs it.
+        if Bundle.main.bundleIdentifier == nil { _ = app.setActivationPolicy(.regular) }
         withExtendedLifetime(delegate) {
             app.run()
         }

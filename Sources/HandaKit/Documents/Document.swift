@@ -243,12 +243,15 @@ final class DocumentController: NSDocumentController {
         }
         do {
             let document = try makeDocument(withContentsOf: url, ofType: try typeForContents(of: url))
+            Automation.mark("documentMade")
             addDocument(document)
-            noteNewRecentDocument(document)
+            Automation.mark("documentAdded")
             if displayDocument {
                 document.makeWindowControllers()
                 document.showWindows()
             }
+            // Open Recent can wait until the file is on screen.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.noteNewRecentDocument(document) }
             completionHandler(document, false, nil)
         } catch {
             completionHandler(nil, false, error)

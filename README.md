@@ -52,7 +52,7 @@ Prefer a download? Tagged versions come with a `Handa.zip` on the [Releases](htt
 - **⌘]** and **⌘[** step through the other files in the same folder.
 - **⌘1** and **⌘2** switch views, like a CSV's table and its raw text, or Markdown and its source.
 - Nothing changes on disk until you save. Handa keeps each file's encoding, line endings and CSV quoting, and an unedited file follows changes made by other apps.
-- Like Preview, Handa stays open after you close its last window, so the next file opens even faster.
+- Like Preview, Handa stays open after you close its last window, so the next file opens even faster. Turn on **Keep Handa ready** in **Settings → General** and it starts, without a window, when you log in, so the first file of the day is just as quick.
 
 ## AI, if you want it
 

@@ -53,7 +53,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
-        if Automation.showOnLaunch == nil { showWelcome(nil) }
+        // Started at login to keep ready: stay out of the way until a file is opened.
+        if Automation.showOnLaunch == nil, !KeepReady.isLoginLaunch { showWelcome(nil) }
         return false
     }
 
