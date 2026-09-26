@@ -42,7 +42,7 @@ cd Handa
 make install
 ```
 
-That puts Handa in Applications and makes it the app that opens PDF, Word, CSV, Markdown and text files when you double-click them. On macOS 26.4 and later, macOS may ask you to confirm each one. Images, code and more can be added in **Settings → General**.
+That puts Handa in Applications and makes it the app that opens PDF, Word, CSV, Markdown and text files when you double-click them. macOS 26.4 and later may ask you to confirm each one. Images, code and more can be added in **Settings → General**.
 
 Prefer a download? Tagged versions come with a `Handa.zip` on the [Releases](https://github.com/Michael-Duck/Handa/releases) page, and Handa offers to become your default viewer the first time you open it. The app isn't notarised, so macOS will stop it at first: open **System Settings → Privacy & Security** and click **Open Anyway**.
 
